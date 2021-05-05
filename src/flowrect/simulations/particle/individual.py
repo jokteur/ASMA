@@ -2,18 +2,7 @@ import numpy as np
 import time
 from numba import jit, prange
 
-
-@jit(nopython=True, nogil=True)
-def f_SRM(x, tau=1, c=1):
-    return np.exp(x / tau) * c
-
-
-# @jit(nopython=True)
-def eta_SRM(x, Gamma, Lambda, tau=1):
-    ret = np.zeros(len(x))
-    for d in range(len(Gamma)):
-        ret += Gamma[d] * np.exp(-Lambda[d] * x)
-    return ret
+from ..util import f_SRM, eta_SRM
 
 
 @jit(nopython=True, nogil=True)
@@ -142,7 +131,7 @@ def simulation_ND_slow(time_end, dt, Gamma, Lambda, M0=0, tau=1, c=1, tolerance=
     return ts, M, spikes
 
 
-def simulation(time_end, dt, Gamma, Lambda, M0=0, tau=1, c=1, tolerance=1e-3):
+def individual(time_end, dt, Gamma, Lambda, M0=0, tau=1, c=1, tolerance=1e-3):
     """
     Parameters
     ----------

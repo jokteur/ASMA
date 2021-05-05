@@ -15,7 +15,7 @@ from bokeh.models.widgets import Button, Div, Toggle, TextAreaInput, Slider
 
 from .util import BaseElement, empty_placeholder, ThrottledEvent
 
-from ..core.simulation import simulation, simulation_ND, eta_SRM, f_SRM
+from ..simulations import particle_individual, eta_SRM, f_SRM
 
 palette_name = "Viridis11"
 
@@ -80,9 +80,15 @@ class MarkovEmbedding2DWidget(BaseElement):
             y_axis_label="M2",
         )
         self._spikes_fig = Figure(
-            plot_width=400, plot_height=150, title="Spikes", x_axis_label="time", x_range=(0, self._time_end)
+            plot_width=400,
+            plot_height=150,
+            title="Spikes",
+            x_axis_label="time",
+            x_range=(0, self._time_end),
         )
-        self._eta_fig = Figure(plot_width=400, plot_height=150, title="η kernel", x_axis_label="time")
+        self._eta_fig = Figure(
+            plot_width=400, plot_height=150, title="η kernel", x_axis_label="time"
+        )
 
         self._ds = ColumnDataSource({"M1": [], "M2": [], "color": []})
         self._ds_pt = ColumnDataSource({"x": [], "y": []})
@@ -104,7 +110,9 @@ class MarkovEmbedding2DWidget(BaseElement):
         #     global_alpha=0.5,
         # )
         self._figure.line(x="x", y="y", source=self._ds_th_line, line_color="green", line_width=1.5)
-        self._figure.line(x="M1", y="M2", source=self._ds, line_color="red", line_width=1.5, line_dash="dotted")
+        self._figure.line(
+            x="M1", y="M2", source=self._ds, line_color="red", line_width=1.5, line_dash="dotted"
+        )
         self._figure.circle(x="x", y="y", source=self._ds_pt)
 
         # For countour plot
@@ -122,7 +130,9 @@ class MarkovEmbedding2DWidget(BaseElement):
         # self._figure.add_layout(self._color_bar, "right")
 
         self._spikes_fig.multi_line(xs="xs", ys="ys", line_color="black", source=self._ds_spikes)
-        self._spikes_fig.line(x="x", y="y", source=self._ds_timeline, line_color="green", line_dash="dashed")
+        self._spikes_fig.line(
+            x="x", y="y", source=self._ds_timeline, line_color="green", line_dash="dashed"
+        )
         self._spikes_fig.yaxis.visible = False
 
         self._eta_fig.line(x="x", y="y", source=self._ds_kernel, line_width=1.5)
@@ -134,7 +144,9 @@ class MarkovEmbedding2DWidget(BaseElement):
 
         self._root = row(
             column(self._figure, self._spikes_fig, self._eta_fig),
-            column(row(self._play_b, self._animate_500_b, self._remove_all_b), *self._sliders.values()),
+            column(
+                row(self._play_b, self._animate_500_b, self._remove_all_b), *self._sliders.values()
+            ),
         )
 
     def timeserie_plot(self):
@@ -145,7 +157,9 @@ class MarkovEmbedding2DWidget(BaseElement):
 
         np.random.seed(self._params["seed"])
         tau = 1 / self._params["tau"]
-        self._ts, self._M, self._spikes = simulation(self._time_end, self._dt, Gamma, Lambda, c=c, tau=tau)
+        self._ts, self._M, self._spikes = particle_individual(
+            self._time_end, self._dt, Gamma, Lambda, c=c, tau=tau
+        )
 
         spikes = self._ts[self._spikes == 1]
         spike_lines_xs = [[t, t] for t in spikes]
@@ -193,7 +207,7 @@ class MarkovEmbedding2DWidget(BaseElement):
         Lambda = [self._params["lambda1"], self._params["lambda2"]]
         c = self._params["c"]
 
-        _, self._Ms, _ = simulation_ND(self._time_end, self._dt, Gamma, Lambda, c=c, N=500)
+        # _, self._Ms, _ = simulation_ND(self._time_end, self._dt, Gamma, Lambda, c=c, N=500)
 
         print(self._Ms.shape)
 
@@ -213,7 +227,9 @@ class MarkovEmbedding2DWidget(BaseElement):
 
     def add_slider(self, name, **args):
         self._sliders[name] = Slider(**args)
-        self._sliders[name].on_change("value", lambda attr, old, new: self.slider_callback(name, attr, old, new))
+        self._sliders[name].on_change(
+            "value", lambda attr, old, new: self.slider_callback(name, attr, old, new)
+        )
         self._params[name] = args["value"]
 
     def slider_callback(self, name, attr, old, new):
@@ -228,7 +244,10 @@ class MarkovEmbedding2DWidget(BaseElement):
             self._time = 0
 
         if type(self._Ms) is np.ndarray:
-            self._ds_pt.data = {"x": [self._Ms[self._time, :, 0]], "y": [self._Ms[self._time, :, 1]]}
+            self._ds_pt.data = {
+                "x": [self._Ms[self._time, :, 0]],
+                "y": [self._Ms[self._time, :, 1]],
+            }
         else:
             self._ds_pt.data = {"x": [self._M[self._time, 0]], "y": [self._M[self._time, 1]]}
         self._ds_timeline.data["x"] = [self._time / 1000, self._time / 1000]

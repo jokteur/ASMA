@@ -3,10 +3,10 @@ import panel as pn
 import holoviews as hv
 import holoviews.plotting.bokeh
 
-from .widgets import MarkovEmbedding2DWidget
+from .widget.widgets import MarkovEmbedding2DWidget
 
 
-def main():
+def widget():
     hv.extension("bokeh")
 
     widget = MarkovEmbedding2DWidget()
