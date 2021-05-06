@@ -44,7 +44,7 @@ params = dict(
 
 print(f"Particle simulation")
 t = time.time()
-ts, M, spikes, A, X = simulation(**params, N=N, Gamma_ext=True)
+ts, M, spikes, A, X = particle_population(**params, N=N, Gamma_ext=True)
 m_t = calculate_mt(M, spikes)
 # m_ts = np.zeros(m_t.T.shape)
 # w = 50
