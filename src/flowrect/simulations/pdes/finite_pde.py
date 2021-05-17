@@ -76,7 +76,7 @@ def _fast_pde(
             Abar[s] += correction_factor * (1 - np.sum(rho_t[s] * da))
 
         # Calculate the activity A
-        p = N * Abar[s] * dt
+        p = Abar[s] * dt
         p = 1 if p > 1 else p
         K = np.random.binomial(N, p)
         A[s] = 1 / N * K

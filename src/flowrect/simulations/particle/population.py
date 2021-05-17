@@ -30,7 +30,7 @@ def _simulation_slow(
     tau,
     c,
     N,
-    Gamma_ext=False,
+    Gamma_ext=True,
 ):
     """
     Parameters
@@ -78,7 +78,7 @@ def _simulation_slow(
             activation = dt * f_SRM(prob, tau=tau, c=c) > noise[t, :]
             decay = ~activation
 
-            M[t, activation] = M[t - 1, activation] + Gamma[activation]
+            M[t, activation] = M[t - 1, activation] + Lambda[activation] * Gamma[activation]
             M[t, decay] = M[t - 1, decay] + dt * (-1 * Lambda[decay] * M[t - 1, decay])
 
             spikes[t, activation] = 1
