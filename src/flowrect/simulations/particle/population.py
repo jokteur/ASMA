@@ -22,34 +22,15 @@ def _simulation_slow(
     dt,
     Gamma,
     Lambda,
-    I_ext_time,
-    I_ext,
+    c,
     interaction,
     lambda_kappa,
-    M0,
-    tau,
-    c,
+    I_ext_time,
+    I_ext,
     N,
+    M0,
     Gamma_ext=True,
 ):
-    """
-    Parameters
-    ----------
-    time_end : float
-        simulation until time_end
-    dt : float
-        time step size
-    Gamma : (d,) numpy array
-        jump size
-    Lambda : (d,) numpy array
-        decay matrix
-    tau : float
-        time scale
-    M0 : (d,) numpy array
-        initial condition
-    N : int
-        number of simulations
-    """
 
     steps = int(time_end / dt)
 
@@ -75,7 +56,7 @@ def _simulation_slow(
 
             prob = np.sum(M[t - 1], axis=1) + X[t - 1]
 
-            activation = dt * f_SRM(prob, tau=tau, c=c) > noise[t, :]
+            activation = dt * f_SRM(prob, c=c) > noise[t, :]
             decay = ~activation
 
             M[t, activation] = M[t - 1, activation] + Lambda[activation] * Gamma[activation]
@@ -90,7 +71,7 @@ def _simulation_slow(
 
             prob = np.sum(M[t - 1] * Gamma, axis=1) + X[t - 1]
 
-            activation = dt * f_SRM(prob, tau=tau, c=c) > noise[t, :]
+            activation = dt * f_SRM(prob, c=c) > noise[t, :]
             decay = ~activation
 
             M[t, activation] = M[t - 1, activation] + 1
@@ -176,13 +157,12 @@ def population(
         dt,
         Gamma,
         Lambda,
-        I_ext_time,
-        I_ext,
+        c,
         interaction,
         lambda_kappa,
-        M0,
-        tau,
-        c,
+        I_ext_time,
+        I_ext,
         N,
+        M0,
         Gamma_ext,
     )

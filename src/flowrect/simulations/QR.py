@@ -93,15 +93,7 @@ def _fast_QR(time_end, dt, Lambda, Gamma, c, lambda_kappa, I_ext, I_ext_time, in
 
 
 def quasi_renewal(
-    time_end,
-    dt,
-    Lambda,
-    Gamma,
-    c,
-    interaction,
-    lambda_kappa,
-    I_ext,
-    I_ext_time,
+    time_end, dt, Lambda, Gamma, c, interaction, lambda_kappa, I_ext, I_ext_time, epsilon_c=1e-2
 ):
     """
     Simulates the quasi-renewal approximation on an SRM neuron population model.

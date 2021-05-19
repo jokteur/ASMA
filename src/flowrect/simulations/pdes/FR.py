@@ -7,7 +7,7 @@ from ..util import f_SRM
 # Not used
 @jit(nopython=True, cache=True)
 def _fast_pde(
-    time_end, dt, a_grid_size, exp_a, Gamma, c, tau, lambda_kappa, I_ext, I_ext_time, interaction
+    time_end, dt, a_grid_size, exp_a, Gamma, c, lambda_kappa, I_ext, I_ext_time, interaction
 ):
     """"""
     steps = int(time_end / dt)
@@ -27,7 +27,7 @@ def _fast_pde(
     # Initial step
     x_fixed = I_ext if I_ext_time == 0 else 0
     m_t_sum = np.sum(exp_a * m_t[0], axis=1)
-    f = f_SRM(m_t_sum + x_t[0], tau=tau, c=c)
+    f = f_SRM(m_t_sum + x_t[0], c=c)
 
     for s in range(1, steps):
         x_fixed = I_ext if I_ext_time < dt * s else 0
@@ -41,7 +41,7 @@ def _fast_pde(
         )
         m_t_sum = np.sum(exp_a * m_t[s], axis=1)
         # m_t_sum = np.sum(exp_a * m_ts[s], axis=1)
-        f = f_SRM(m_t_sum + x_t[s], tau=tau, c=c)
+        f = f_SRM(m_t_sum + x_t[s], c=c)
 
         rho_t[s] = rho_t[s - 1]
         # Mass loss
@@ -143,7 +143,6 @@ def flow_rectification(
         exp_a,
         Gamma,
         c,
-        tau,
         lambda_kappa,
         I_ext,
         I_ext_time,
