@@ -106,33 +106,58 @@ def _simulation_slow(
 def population(
     time_end,
     dt,
-    Gamma,
     Lambda,
+    Gamma,
+    c=1,
+    interaction=0,
+    lambda_kappa=20,
     I_ext_time=2,
     I_ext=2,
-    interaction=1,
-    lambda_kappa=20,
-    M0=0,
-    tau=1,
-    c=1,
     N=500,
-    Gamma_ext=False,
+    M0=0,
+    Gamma_ext=True,
 ):
     """
+    Simulates an SRM neuron population.
+
+
     Parameters
     ----------
     time_end : float
         simulation until time_end
     dt : float
         time step size
-    Gamma : (d,) numpy array
-        jump size
     Lambda : (d,) numpy array
         decay matrix
-    tau : float
-        time scale
-    M0 : (d,) numpy array
-        initial condition
+    Gamma : (d,) numpy array
+        jump size
+    c : float
+        base firing rate
+    interaction : float
+        strength of the self interaction (variable J in equations)
+    lambda_kappa : float
+        decay parameter in the self interaction kernel kappa
+    I_ext_time : float
+        time at which a constant current is injected in the population
+    I_ext : float
+        intensity of the constant current
+    N : int
+        size of the population
+    M0 : float or numpy array
+        initial conditions of the leaky memory
+    Gamma_ext : boolean
+        obsolete (don't put to false)
+
+    Returns
+    -------
+    ts : numpy array
+        time grid of the simulation
+    M : numpy array
+        the leaky memory variables
+    A : numpy array
+        activity of the population
+    X : numpy array
+        interaction of the population
     """
 
     if isinstance(Gamma, (float, int)):

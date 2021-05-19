@@ -98,12 +98,45 @@ def quasi_renewal(
     Lambda,
     Gamma,
     c,
+    interaction,
     lambda_kappa,
     I_ext,
     I_ext_time,
-    interaction,
-    epsilon_c=1e-2,
 ):
+    """
+    Simulates the quasi-renewal approximation on an SRM neuron population model.
+
+
+    Parameters
+    ----------
+    time_end : float
+        simulation until time_end
+    dt : float
+        time step size
+    Lambda : (d,) numpy array
+        decay matrix
+    Gamma : (d,) numpy array
+        jump size
+    c : float
+        base firing rate
+    interaction : float
+        strength of the self interaction (variable J in equations)
+    lambda_kappa : float
+        decay parameter in the self interaction kernel kappa
+    I_ext_time : float
+        time at which a constant current is injected in the population
+    I_ext : float
+        intensity of the constant current
+
+    Returns
+    -------
+    ts : numpy array
+        time grid of the simulation
+    A : numpy array
+        activity of the PDE
+    tau_c : float
+        value of the cutoff calculated as explained in [Naud, Gerstner, 2012]
+    """
     # Check if model will not explode
     if np.sum(Gamma) > 0:
         print(f"Model will explode with {Gamma=}. Cannot performe QR.")

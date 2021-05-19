@@ -86,33 +86,6 @@ def _fast_pde(
         part_1moment_ji = np.einsum("kj,i,kj->kij", exp_La, LambdaGamma, G1)
         part_2moment = (exp_La_ij - 1) * G2
 
-        if s % 100 == 0 and False:
-            new_moment0 = np.zeros((a_grid_size, dim, dim))
-            new_1moment_ij = np.zeros((a_grid_size, dim, dim))
-            new_1moment_ji = np.zeros((a_grid_size, dim, dim))
-            new_2moment = np.zeros((a_grid_size, dim, dim))
-
-            for a in range(a_grid_size):
-                for i in range(dim):
-                    for j in range(dim):
-                        new_moment0[a, i, j] = G0[a] * LambdaGamma[i] * LambdaGamma[j]
-                        new_1moment_ij[a, i, j] = exp_La[a, i] * LambdaGamma[j] * G1[a, i]
-                        new_1moment_ji[a, i, j] = exp_La[a, j] * LambdaGamma[i] * G1[a, j]
-                        new_2moment[a, i, j] = (
-                            np.exp(-(Lambda[i] + Lambda[j]) * a_grid[a]) - 1
-                        ) * G2[a, i, j]
-            print("Moment 0 total err:", np.sum(part_0moment - new_moment0))
-            print("Moment 1 ij total err:", np.sum(part_1moment_ij - new_1moment_ij))
-            print("Moment 1 ji total err:", np.sum(part_1moment_ji - new_1moment_ji))
-            print("Moment 2 total err:", np.sum(part_2moment - new_2moment))
-            # print(
-            #     np.sum(
-            #         (part_0moment + part_1moment_ij + part_1moment_ji + part_2moment) * da, axis=0
-            #     )
-            # )
-            print()
-        # print(n_t[s])
-
         n_t[s] = n_t[s - 1] + dt * np.sum(
             ((part_0moment + part_1moment_ij + part_1moment_ji + part_2moment).T * rho_t[s - 1]).T
             * da,

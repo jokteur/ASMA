@@ -65,14 +65,58 @@ def flow_rectification(
     Lambda,
     Gamma,
     c,
+    interaction,
     lambda_kappa,
     I_ext,
     I_ext_time,
-    interaction,
-    tau=1,
     a_cutoff=5,
-    epsilon=1e-8,
 ):
+    """
+    Simulates a population density equation approximation of an infinite SRM
+    neuron population.
+
+
+    Parameters
+    ----------
+    time_end : float
+        simulation until time_end
+    dt : float
+        time step size
+    Lambda : (d,) numpy array
+        decay matrix
+    Gamma : (d,) numpy array
+        jump size
+    c : float
+        base firing rate
+    interaction : float
+        strength of the self interaction (variable J in equations)
+    lambda_kappa : float
+        decay parameter in the self interaction kernel kappa
+    I_ext_time : float
+        time at which a constant current is injected in the population
+    I_ext : float
+        intensity of the constant current
+    a_cutoff : float
+        in the integration, max age a that is considered. Anything greater than
+        a_cutoff will not be considered.
+
+    Returns
+    -------
+    ts : numpy array
+        time grid of the simulation
+    a_grid : numpy array
+        age grid (from 0 to a_cutoff)
+    rho_t : numpy array
+        population probability density of time
+    m_t : numpy array
+        mean time at spike of leaky memory variable
+    x_t : numpy array
+        self interaction of the population
+    mass_conservation : numpy array
+        mass conservation over time of the PDE
+    activity : numpy array
+        activity of the PDE
+    """
     if isinstance(Gamma, (float, int)):
         Gamma = [Gamma]
     if isinstance(Lambda, (float, int)):
@@ -106,6 +150,6 @@ def flow_rectification(
         interaction,
     )
 
-    energy_conservation = np.sum(rho_t * dt, axis=-1)
+    mass_conservation = np.sum(rho_t * dt, axis=-1)
     activity = rho_t[:, 0]
-    return ts, a_grid, rho_t, m_t, x_t, energy_conservation, activity
+    return ts, a_grid, rho_t, m_t, x_t, mass_conservation, activity
