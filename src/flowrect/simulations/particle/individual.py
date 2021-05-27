@@ -6,147 +6,100 @@ from ..util import f_SRM, eta_SRM
 
 
 @jit(nopython=True, nogil=True)
-def _simulation_fast(time_end, dt, Gamma, Lambda, M0=0, tau=1, c=1, tolerance=1e-3):
-    """
-    Parameters
-    ----------
-    time_end : float
-        simulation until time_end
-    dt : float
-        time step size
-    Gamma : (d,) numpy array
-        jump size
-    Lambda : (d,) numpy array
-        decay matrix
-    tau : float
-        time scale
-    M0 : (d,) numpy array
-        initial condition
-    """
+def _simulation_fast(
+    time_end,
+    dt,
+    Gamma,
+    Lambda,
+    c,
+    interaction,
+    lambda_kappa,
+    I_ext_time,
+    I_ext,
+    M0,
+):
 
     steps = int(time_end / dt)
 
     dim = Gamma.shape[0]
 
-    noise = np.random.rand(steps)
-    spikes = np.zeros((steps,))
+    J = interaction
+
+    noise = np.random.rand(steps)  # N indep. Poisson variables
+    spikes = np.zeros(steps)
     ts = np.linspace(0, time_end, steps)
 
     M = np.zeros((steps, dim))
+    X = np.zeros(steps)
+    M[0] = M0
 
-    for t in range(1, steps):
-        if dt * f_SRM(np.dot(M[t - 1], Gamma), tau=tau, c=c) > noise[t]:
-            M[t] = M[t - 1] + 1
-            spikes[t] = 1
+    # If True, jumps by Lambda*Gamma instead of Lambda
+    for s in range(1, steps):
+        x_fixed = I_ext if I_ext_time < dt * s else 0
+        activation = 1 - np.exp(-dt * f_SRM(np.sum(M[s - 1]) + X[s - 1], c=c)) > noise[s]
+
+        if activation:
+            M[s] = M[s - 1] + Gamma
+            spikes[s] = 1
         else:
-            M[t] = M[t - 1] - dt * np.multiply(Lambda, M[t - 1])
+            M[s] = M[s - 1] + dt * (-1 * Lambda * M[s - 1])
 
-    return ts, M, spikes
+        X[s] = X[s - 1] + dt * (-lambda_kappa * X[s - 1] + lambda_kappa * (x_fixed))
+
+    return ts, M, spikes, X
 
 
-@jit(nopython=True, parallel=True)
-def simulation_ND(time_end, dt, Gamma, Lambda, M0=0, tau=1, c=1, tolerance=1e-3, N=1):
+def individual(
+    time_end,
+    dt,
+    Lambda,
+    Gamma,
+    c=1,
+    interaction=0,
+    lambda_kappa=20,
+    I_ext_time=0,
+    I_ext=0,
+    M0=0,
+    use_LambdaGamma=False,
+):
     """
+    Simulates an SRM neuron.
+
+
     Parameters
     ----------
     time_end : float
         simulation until time_end
     dt : float
         time step size
-    Gamma : (d,) numpy array
-        jump size
     Lambda : (d,) numpy array
         decay matrix
-    tau : float
-        time scale
-    M0 : (d,) numpy array
-        initial condition
-    N : int
-        number of simulations
-    """
-
-    dim = Gamma.shape[0]
-    steps = int(time_end / dt)
-    spikes = np.zeros((N, steps))
-
-    Ms = np.zeros((N, steps, dim))
-
-    for i in prange(N):
-        ts, M, spike = _simulation_fast(time_end, dt, Gamma, Lambda)
-        Ms[i] = M
-        spikes[i] = spike
-    return Ms, spikes
-
-
-def simulation_ND_slow(time_end, dt, Gamma, Lambda, M0=0, tau=1, c=1, tolerance=1e-3, N=1):
-    """
-    Parameters
-    ----------
-    time_end : float
-        simulation until time_end
-    dt : float
-        time step size
     Gamma : (d,) numpy array
         jump size
-    Lambda : (d,) numpy array
-        decay matrix
-    tau : float
-        time scale
-    M0 : (d,) numpy array
-        initial condition
-    N : int
-        number of simulations
-    """
+    c : float
+        base firing rate
+    interaction : float
+        strength of the self interaction (variable J in equations)
+    lambda_kappa : float
+        decay parameter in the self interaction kernel kappa
+    I_ext_time : float
+        time at which a constant current is injected in the population
+    I_ext : float
+        intensity of the constant current
+    M0 : float or numpy array
+        initial conditions of the leaky memory
+    use_LambdaGamma : bool
+        if True, replace Gamma by Gamma .* Lambda
+        (to be compatible with previous versions, let it by default to False)
 
-    if isinstance(Gamma, (float, int)):
-        Gamma = [Gamma]
-    if isinstance(Lambda, (float, int)):
-        Lambda = [Lambda]
-
-    steps = int(time_end / dt)
-    Gamma = np.array(Gamma)
-    Lambda = np.array(Lambda)
-
-    dim = Gamma.shape[0]
-
-    Gamma = np.tile(Gamma, (N, 1))
-    Lambda = np.tile(Lambda, (N, 1))
-
-    noise = np.random.rand(steps, N)
-    spikes = np.zeros((steps, N))
-    ts = np.linspace(0, time_end, steps)
-
-    M = np.zeros((steps, N, dim))
-    # M[0] = np.tile(M0, (N, 1))
-
-    for t in range(1, steps):
-        activation = dt * f_SRM(np.sum(M[t - 1] * Gamma, axis=1), tau=tau, c=c) > noise[t, :]
-        decay = ~activation
-
-        M[t, activation] = M[t - 1, activation] + 1
-        spikes[t, activation] = 1
-
-        M[t, decay] = M[t - 1, decay] + dt * (-1 * Lambda[decay] * M[t - 1, decay])
-
-    return ts, M, spikes
-
-
-def individual(time_end, dt, Gamma, Lambda, M0=0, tau=1, c=1, tolerance=1e-3):
-    """
-    Parameters
-    ----------
-    time_end : float
-        simulation until time_end
-    dt : float
-        time step size
-    Gamma : (d,) numpy array
-        jump size
-    Lambda : (d,) numpy array
-        decay matrix
-    tau : float
-        time scale
-    M0 : (d,) numpy array
-        initial condition
+    Returns
+    -------
+    ts : numpy array
+        time grid of the simulation
+    M : numpy array
+        the leaky memory variable
+    X : numpy array
+        interaction of the neuron
     """
 
     if isinstance(Gamma, (float, int)):
@@ -157,4 +110,18 @@ def individual(time_end, dt, Gamma, Lambda, M0=0, tau=1, c=1, tolerance=1e-3):
     Gamma = np.array(Gamma)
     Lambda = np.array(Lambda)
 
-    return _simulation_fast(time_end, dt, Gamma, Lambda, M0, tau, c)
+    if use_LambdaGamma:
+        Gamma = Lambda * Gamma
+
+    return _simulation_fast(
+        time_end,
+        dt,
+        Gamma,
+        Lambda,
+        c,
+        interaction,
+        lambda_kappa,
+        I_ext_time,
+        I_ext,
+        M0,
+    )
