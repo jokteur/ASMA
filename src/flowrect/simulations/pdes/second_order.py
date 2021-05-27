@@ -19,6 +19,8 @@ def _fast_pde(
     I_ext,
     I_ext_time,
     interaction,
+    m_t0,
+    n_t0,
 ):
     """"""
     steps = int(time_end / dt)
@@ -28,10 +30,13 @@ def _fast_pde(
     ts = np.linspace(0, time_end, steps)
     rho_t = np.zeros((steps, a_grid_size))  # Probability density distribution
     m_t = np.zeros((steps, dim))  # First moment vector
-    m_t2 = np.zeros((steps, dim))
     n_t = np.zeros((steps, dim, dim))  # Second moments vector
     V_t = np.zeros((steps, dim, dim))  # Semi-definite covariance matrix
     x_t = np.zeros(steps)  # Interaction parameter
+
+    # Initial conditions
+    m_t[0] = m_t0
+    n_t[0] = n_t0
 
     rho_t[0, 0] = 1 / dt  # All the mass is concentrated at age 0 in the beginning of sim.
     J = interaction  # interaction = J from our equations
@@ -45,7 +50,6 @@ def _fast_pde(
     x_fixed = I_ext if I_ext_time == 0 else 0
     m_t_sum = np.sum(exp_La * m_t[0], axis=1)
     G0 = f_SRM(m_t_sum + x_t[0], c=c)
-    f = G0
     G1 = 0
     G2 = 0
 
@@ -53,15 +57,12 @@ def _fast_pde(
         x_fixed = I_ext if I_ext_time < dt * s else 0
 
         # Basis calculations for the Gaussian moments
+
         exp_variance = (V_t[s - 1] @ exp_La.T).T  # Makes a (a_grid_size, dim) matrix
         gauss_param = m_t[s - 1] + 0.5 * exp_variance  # (a_grid_size, dim) matrix
+        # g corresponds to c * exp(h + e^-Lambda.a (m + 1/2 V e^-Lambda.a))
         g = c * np.exp(x_t[s - 1] + np.sum(exp_La * gauss_param, axis=1))  # (a_grid_size,) vector
         moment1 = m_t[s - 1] + exp_variance  # (a_grid_size, dim) matrix
-
-        # From first moment (to erase)
-        m_t_sum = np.sum(exp_La * m_t2[s - 1], axis=1)
-        # m_t_sum = np.sum(exp_a * m_ts[s], axis=1)
-        f = f_SRM(m_t_sum + x_t[s - 1], c=c)
 
         # Gaussian moments
         G0 = g
@@ -71,14 +72,10 @@ def _fast_pde(
         # This values are reused in multiple calculations
         LambdaGamma = Lambda * Gamma
 
-        # Update first moments
-        m_t2[s] = m_t2[s - 1] + dt * np.sum(
-            ((LambdaGamma - (1 - exp_La) * m_t2[s - 1]).T * f) * rho_t[s - 1] * da, axis=1
-        )
-        m_t[s] = m_t[s - 1] + dt * np.sum(
-            ((exp_La - 1) * G1 + np.einsum("i,j->ji", LambdaGamma, G0)).T * rho_t[s - 1] * da,
-            axis=1,
-        )
+        # Store the expression that is in curly brackets for evolution of m_t
+        m_t_curly_bracket_expr = (exp_La - 1) * G1 + np.einsum("i,j->ji", LambdaGamma, G0)
+
+        m_t[s] = m_t[s - 1] + dt * np.einsum("ij,i->j", m_t_curly_bracket_expr, da * rho_t[s - 1])
 
         # Update second moments
         part_0moment = np.einsum("i,j,k->kij", LambdaGamma, LambdaGamma, G0)
@@ -86,9 +83,10 @@ def _fast_pde(
         part_1moment_ji = np.einsum("kj,i,kj->kij", exp_La, LambdaGamma, G1)
         part_2moment = (exp_La_ij - 1) * G2
 
+        moment_sum = part_0moment + part_1moment_ij + part_1moment_ji + part_2moment
+
         n_t[s] = n_t[s - 1] + dt * np.sum(
-            ((part_0moment + part_1moment_ij + part_1moment_ji + part_2moment).T * rho_t[s - 1]).T
-            * da,
+            np.einsum("i,ijk->ijk", rho_t[s - 1], moment_sum) * da,
             axis=0,
         )
 
@@ -98,7 +96,7 @@ def _fast_pde(
         # Update self interaction
         x_t[s] = x_t[s - 1] + dt * (
             -lambda_kappa * x_t[s - 1]
-            + lambda_kappa * (np.sum(f * rho_t[s - 1] * da) * J + x_fixed)
+            + lambda_kappa * (np.sum(G0 * rho_t[s - 1] * da) * J + x_fixed)
         )
 
         rho_t[s] = rho_t[s - 1]
@@ -127,6 +125,8 @@ def flow_rectification_2nd_order(
     I_ext,
     I_ext_time,
     interaction,
+    m_t0=0,
+    n_t0=0,
     a_cutoff=5,
 ):
     """
@@ -187,6 +187,8 @@ def flow_rectification_2nd_order(
         I_ext,
         I_ext_time,
         interaction,
+        m_t0,
+        n_t0,
     )
 
     energy_conservation = np.sum(rho_t * dt, axis=-1)

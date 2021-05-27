@@ -7,7 +7,7 @@ from ..util import f_SRM
 # Not used
 @jit(nopython=True, cache=True)
 def _fast_pde(
-    time_end, dt, a_grid_size, exp_a, Gamma, c, lambda_kappa, I_ext, I_ext_time, interaction
+    time_end, dt, a_grid_size, exp_a, Gamma, c, lambda_kappa, I_ext, I_ext_time, interaction, m_t0=0
 ):
     """"""
     steps = int(time_end / dt)
@@ -17,6 +17,7 @@ def _fast_pde(
     ts = np.linspace(0, time_end, steps)
     rho_t = np.zeros((steps, a_grid_size))
     m_t = np.zeros((steps, dim))
+    m_t[0] = m_t0
     x_t = np.zeros(steps)
 
     rho_t[0, 0] = 1 / dt
@@ -70,6 +71,8 @@ def flow_rectification(
     I_ext,
     I_ext_time,
     a_cutoff=5,
+    use_LambdaGamma=False,
+    m_t0=0,
 ):
     """
     Simulates a population density equation approximation of an infinite SRM
@@ -80,40 +83,59 @@ def flow_rectification(
     ----------
     time_end : float
         simulation until time_end
+
     dt : float
         time step size
+
     Lambda : (d,) numpy array
         decay matrix
+
     Gamma : (d,) numpy array
         jump size
+
     c : float
         base firing rate
+
     interaction : float
         strength of the self interaction (variable J in equations)
+
     lambda_kappa : float
         decay parameter in the self interaction kernel kappa
+
     I_ext_time : float
         time at which a constant current is injected in the population
+
     I_ext : float
         intensity of the constant current
+
     a_cutoff : float
         in the integration, max age a that is considered. Anything greater than
         a_cutoff will not be considered.
+
+    use_LambdaGamma : bool
+        if True, replace Gamma by Gamma .* Lambda
+        (to be compatible with previous versions, let it by default to False)
 
     Returns
     -------
     ts : numpy array
         time grid of the simulation
+
     a_grid : numpy array
         age grid (from 0 to a_cutoff)
+
     rho_t : numpy array
         population probability density of time
+
     m_t : numpy array
         mean time at spike of leaky memory variable
+
     x_t : numpy array
         self interaction of the population
+
     mass_conservation : numpy array
         mass conservation over time of the PDE
+
     activity : numpy array
         activity of the PDE
     """
@@ -135,6 +157,9 @@ def flow_rectification(
     # Shape must be in order: len, d, d
     exp_a = np.exp(-Lambda * a_d_grid)
 
+    if use_LambdaGamma:
+        Gamma = Gamma * Lambda
+
     # Simulation
     ts, rho_t, m_t, x_t = _fast_pde(
         time_end,
@@ -147,6 +172,7 @@ def flow_rectification(
         I_ext,
         I_ext_time,
         interaction,
+        m_t0,
     )
 
     mass_conservation = np.sum(rho_t * dt, axis=-1)

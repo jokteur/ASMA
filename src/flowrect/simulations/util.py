@@ -3,6 +3,10 @@ from numba import jit
 from numba.extending import overload
 
 
+def moving_average(x, w):
+    return np.convolve(x, np.ones(w), "valid") / w
+
+
 @jit(nopython=True)
 def calculate_age(array):
     ret = np.zeros(array.shape)
@@ -41,7 +45,11 @@ def calculate_mt(M, spikes):
     m_t = np.nanmean(m_t, axis=1)
 
     m_t = replace_NaN(m_t)
-    return m_t.T
+    return m_t
+
+
+def calculate_nt(m_t):
+    return np.einsum("ai,aj->aij", m_t, m_t)
 
 
 calculate_mt(np.zeros((10, 5, 2)), np.zeros((10, 5)))
@@ -53,7 +61,7 @@ def f_SRM(x, tau=1, c=1):
 
 
 @jit(nopython=True)
-def eta_SRM(x, Gamma, Lambda, tau=1):
+def eta_SRM(x, Gamma, Lambda, use_LambdaGamma=False, tau=1):
     ret = np.zeros(len(x))
     for d in range(len(Gamma)):
         ret += Gamma[d] * np.exp(-Lambda[d] * x)

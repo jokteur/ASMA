@@ -25,20 +25,21 @@ burst = True
 burst_cache_path = ""
 
 dt = 1e-2
-N = 25000
+N = 500
 # Take similar as in article
 params = dict(
     dt=dt,
-    # Lambda=[33.3, 2.5],
-    # Gamma=[-8.0, -1.0],
-    Lambda=np.array([28.0, 8.0, 1.0]),
-    Gamma=np.array([-3.5, 3.0, -1.0]),
+    Lambda=[33.3, 2.5],
+    Gamma=[-8.0, -1.0],
+    # Lambda=np.array([28.0, 8.0, 1.0]),
+    # Gamma=np.array([-3.5, 3.0, -1.0]),
     c=10,
     lambda_kappa=2,
     I_ext=0.5,
     I_ext_time=20,
     interaction=0,
 )
+# params["Gamma"] = np.array(params["Gamma"]) / np.array(params["Lambda"])
 
 # Trigger compilations
 t = time.time()
@@ -53,6 +54,9 @@ t = time.time()
 params["dt"] = dt
 params["time_end"] = 30
 
+QR_params = copy.copy(params)
+# QR_params["Gamma"] = np.array(QR_params["Gamma"]) * np.array(QR_params["Lambda"])
+
 # External input range
 total_points = 30
 I_end = 2.5
@@ -64,15 +68,17 @@ I_vec_sim = np.linspace(0, I_end, num_sim)
 def simulate_pdes(i):
     t = time.time()
     params["I_ext"] = I_vec[i]
+    QR_params["I_ext"] = I_vec[i]
     params["dt"] = dt
+    QR_params["dt"] = dt
 
     Ainf_QR = None
     if not burst:
-        ts_QR, A_QR, cutoff = quasi_renewal(**params)
+        ts_QR, A_QR, cutoff = quasi_renewal(**QR_params)
         Ainf_QR = A_QR[-1]
 
     cparams = copy.copy(params)
-    cparams["dt"] = 1e-3
+    cparams["dt"] = 1e-2
     ts_PDE, a_grid, rho_t, m_t, X_PDE, en_cons, A_PDE = flow_rectification(a_cutoff=7, **cparams)
 
     Ainf_PDE = A_PDE[-1]
@@ -89,7 +95,7 @@ def simulate_particle(i):
         cparams = copy.copy(params)
         cparams["dt"] = 1e-2
         cparams["I_ext"] = I_vec[i]
-        ts_P, M, spikes, A_P, X_P = simulation(N=N, Gamma_ext=True, **cparams)
+        ts_P, M, spikes, A_P, X_P = particle_population(N=N, Gamma_ext=True, **cparams)
 
         # Take the last seconds in activity
         last_seconds_idx = len(A_P) - 1 - int(1 / dt * 5)

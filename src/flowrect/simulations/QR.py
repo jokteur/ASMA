@@ -31,7 +31,19 @@ def find_cutoff(begin, end, dt, Lambda, Gamma, epsilon_c):
 
 
 @jit(nopython=True, cache=True)
-def _fast_QR(time_end, dt, Lambda, Gamma, c, lambda_kappa, I_ext, I_ext_time, interaction, tau_c):
+def _fast_QR(
+    time_end,
+    dt,
+    Lambda,
+    Gamma,
+    c,
+    lambda_kappa,
+    I_ext,
+    I_ext_time,
+    interaction,
+    tau_c,
+    use_LambdaGamma,
+):
     """"""
     steps = int(time_end / dt)
     A = np.zeros(steps)
@@ -52,8 +64,8 @@ def _fast_QR(time_end, dt, Lambda, Gamma, c, lambda_kappa, I_ext, I_ext_time, in
     A[0] = 1 / dt
 
     # Fixed vectors
-    eta = eta_SRM(np.linspace(tau_c, 0, K), Gamma, Lambda)
-    y = np.exp(eta_SRM(np.linspace(2 * tau_c, 0, 2 * K), Gamma, Lambda)) - 1
+    eta = eta_SRM(np.linspace(tau_c, 0, K), Gamma, Lambda, use_LambdaGamma)
+    y = np.exp(eta_SRM(np.linspace(2 * tau_c, 0, 2 * K), Gamma, Lambda, use_LambdaGamma)) - 1
 
     # Use conventions as in article
     for s in range(1, steps):
@@ -93,7 +105,17 @@ def _fast_QR(time_end, dt, Lambda, Gamma, c, lambda_kappa, I_ext, I_ext_time, in
 
 
 def quasi_renewal(
-    time_end, dt, Lambda, Gamma, c, interaction, lambda_kappa, I_ext, I_ext_time, epsilon_c=1e-2
+    time_end,
+    dt,
+    Lambda,
+    Gamma,
+    c,
+    interaction,
+    lambda_kappa,
+    I_ext,
+    I_ext_time,
+    epsilon_c=1e-2,
+    use_LambdaGamma=False,
 ):
     """
     Simulates the quasi-renewal approximation on an SRM neuron population model.
@@ -103,29 +125,46 @@ def quasi_renewal(
     ----------
     time_end : float
         simulation until time_end
+
     dt : float
         time step size
+
     Lambda : (d,) numpy array
         decay matrix
+
     Gamma : (d,) numpy array
         jump size
+
     c : float
         base firing rate
+
     interaction : float
         strength of the self interaction (variable J in equations)
+
     lambda_kappa : float
         decay parameter in the self interaction kernel kappa
+
     I_ext_time : float
         time at which a constant current is injected in the population
+
     I_ext : float
         intensity of the constant current
+
+    epsilon_c : float
+        degree of precision to which tau_cutoff must be found
+
+    use_LambdaGamma : bool
+        if True, replace Gamma by Gamma .* Lambda
+        (to be compatible with previous versions, let it by default to False)
 
     Returns
     -------
     ts : numpy array
         time grid of the simulation
+
     A : numpy array
         activity of the PDE
+
     tau_c : float
         value of the cutoff calculated as explained in [Naud, Gerstner, 2012]
     """
@@ -137,13 +176,25 @@ def quasi_renewal(
     Gamma = np.array(Gamma)
     Lambda = np.array(Lambda)
 
+    if use_LambdaGamma:
+        Gamma = Gamma * Lambda
     # Find cutoff tau_c
     tau_c = find_cutoff(0, 100, dt, Lambda, Gamma, epsilon_c)
     tau_c = np.round(tau_c, decimals=int(-np.log10(dt)))
 
     return (
         *_fast_QR(
-            time_end, dt, Lambda, Gamma, c, lambda_kappa, I_ext, I_ext_time, interaction, tau_c
+            time_end,
+            dt,
+            Lambda,
+            Gamma,
+            c,
+            lambda_kappa,
+            I_ext,
+            I_ext_time,
+            interaction,
+            tau_c,
+            use_LambdaGamma,
         ),
         tau_c,
     )

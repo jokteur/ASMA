@@ -34,12 +34,12 @@ I_ext = 5
 params = dict(
     time_end=40,
     dt=dt,
-    # Lambda=[1.0, 2.5],
-    # Gamma=[-5.5, 1.0],
-    Lambda=np.array([28.0, 8.0, 1.0]),
-    Gamma=np.array([-3.5, 3.0, -1.0]),
+    Lambda=np.array([1.0, 2.5]),
+    Gamma=np.array([-5.5, 1.0]),
+    # Lambda=np.array([28.0, 8.0, 1.0]),
+    # Gamma=np.array([-3.5, 3.0, -1.0]),
     c=10,
-    lambda_kappa=1,
+    lambda_kappa=2,
     I_ext=2,
     I_ext_time=20,
     interaction=0.0,
@@ -66,19 +66,19 @@ print(f"{time.time() - t:.2f}s")
 print(f"Quasi renewal")
 QR_params = copy.copy(params)
 QR_params["Gamma"] = np.array(params["Lambda"]) * np.array(params["Gamma"])
-ts, A_QR, _ = quasi_renewal(**params)
+ts, A_QR, _ = quasi_renewal(use_LambdaGamma=True, **params)
 
 print(f"Particle simulation")
 t = time.time()
-ts, M, spikes, A, X = particle_population(**params, N=N, Gamma_ext=True)
+ts, M, spikes, A, X = particle_population(**params, N=N, Gamma_ext=True, use_LambdaGamma=False)
 m_tp = calculate_mt(M, spikes)
 print(f"{time.time() - t:.2f}")
 
 print(f"Flow rectification approximation")
 t = time.time()
-params["dt"] = 1e-3
+# params["dt"] = 1e-3
 ts_1st, a_grid_1st, rho_t_1st, m_t_1st, x_t_1st, en_cons_1st, A_t_1st = flow_rectification(
-    a_cutoff=a_cutoff, **params
+    a_cutoff=a_cutoff, use_LambdaGamma=True, **params
 )
 print(f"{time.time() - t:.2f}s")
 
