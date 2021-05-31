@@ -1,0 +1,19 @@
+[package]
+edition = "2018"
+name = "accelerated"
+version = "0.1.0"
+
+[lib]
+crate-type = ["cdylib"]
+name = "accelerated"
+
+[dependencies]
+ndarray = {version = "0.14", features = ["rayon"]}
+ndarray-rand = "0.13"
+numpy = "0.13"
+rand = "0.8.3"
+rayon = "1.0.2"
+
+[dependencies.pyo3]
+features = ["extension-module"]
+version = "0.13.2"
