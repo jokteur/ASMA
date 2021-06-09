@@ -12,6 +12,8 @@ def _simulation_slow(
     Gamma,
     Lambda,
     c,
+    Delta,
+    theta,
     interaction,
     lambda_kappa,
     I_ext_time,
@@ -34,15 +36,21 @@ def _simulation_slow(
     ts = np.linspace(0, time_end, steps)
 
     M = np.zeros((steps, N, dim))
-    X = np.zeros(steps)
+    H = np.zeros(steps)
     A = np.zeros(steps)
     # M[0] = np.tile(M0, (N, 1))
 
     # If True, jumps by Lambda*Gamma instead of Lambda
     for s in range(1, steps):
-        x_fixed = I_ext if I_ext_time < dt * s else 0
+        x_fixed = I_ext if I_ext_time < dt * (s - 1) else 0
 
-        activation = 1 - np.exp(-dt * f_SRM(np.sum(M[s - 1], axis=1) + X[s - 1], c=c)) > noise[s, :]
+        activation = (
+            1
+            - np.exp(
+                -dt * f_SRM(np.sum(M[s - 1], axis=1) + H[s - 1], c=c, Delta=Delta, theta=theta)
+            )
+            > noise[s, :]
+        )
         decay = ~activation
 
         M[s, activation] = M[s - 1, activation] + Gamma[activation]
@@ -50,9 +58,9 @@ def _simulation_slow(
 
         spikes[s, activation] = 1
         A[s] = 1 / N * np.count_nonzero(activation) / dt
-        X[s] = X[s - 1] + dt * (-lambda_kappa * X[s - 1] + lambda_kappa * (J * A[s] + x_fixed))
+        H[s] = H[s - 1] + dt * lambda_kappa * (-H[s - 1] + (J * A[s] + x_fixed))
 
-    return ts, M, spikes, A, X
+    return ts, M, spikes, A, H
 
 
 def population_nomemory(
@@ -61,6 +69,8 @@ def population_nomemory(
     Lambda,
     Gamma,
     c=1,
+    Delta=1,
+    theta=0,
     interaction=0,
     lambda_kappa=20,
     I_ext_time=0,
@@ -99,7 +109,7 @@ def population_nomemory(
     m = np.zeros((N, dim))
     m_t = np.zeros((steps, dim))
     n_t = np.zeros((steps, dim, dim))
-    X = np.zeros(steps)
+    H = np.zeros(steps)
     A = np.zeros(steps)
     # M[0] = np.tile(M0, (N, 1))
 
@@ -109,7 +119,10 @@ def population_nomemory(
 
         noise = np.zeros(N)
 
-        activation = 1 - np.exp(-dt * f_SRM(np.sum(m, axis=1) + X[s - 1], c=c)) > noise
+        activation = (
+            1 - np.exp(-dt * f_SRM(np.sum(m, axis=1) + H[s - 1], c=c, Delta=Delta, theta=theta))
+            > noise
+        )
         decay = ~activation
 
         m[activation] += Gamma[activation]
@@ -122,7 +135,7 @@ def population_nomemory(
             m_t[s] = m_t[s - 1]
         n_t[s] = np.outer(m_t[s], m_t[s])
         A[s] = 1 / N * np.count_nonzero(activation) / dt
-        X[s] = X[s - 1] + dt * (-lambda_kappa * X[s - 1] + lambda_kappa * (J * A[s] + x_fixed))
+        H[s] = H[s - 1] + dt * lambda_kappa * (-H[s - 1] + (J * A[s] + x_fixed))
 
     # return ts, M, spikes, A, X
 
@@ -133,6 +146,8 @@ def population_fast(
     Lambda,
     Gamma,
     c=1,
+    Delta=1,
+    theta=0,
     interaction=0,
     lambda_kappa=20,
     I_ext_time=0,
@@ -205,7 +220,19 @@ def population_fast(
         Gamma = Gamma * Lambda
 
     _rust_population(
-        time_end, dt, Gamma, Lambda, c, interaction, lambda_kappa, I_ext_time, I_ext, N, M0
+        time_end,
+        dt,
+        Gamma,
+        Lambda,
+        c,
+        Delta,
+        theta,
+        interaction,
+        lambda_kappa,
+        I_ext_time,
+        I_ext,
+        N,
+        M0,
     )
 
 
@@ -215,6 +242,8 @@ def population(
     Lambda,
     Gamma,
     c=1,
+    Delta=1,
+    theta=0,
     interaction=0,
     lambda_kappa=20,
     I_ext_time=0,
@@ -290,6 +319,8 @@ def population(
         Gamma,
         Lambda,
         c,
+        Delta,
+        theta,
         interaction,
         lambda_kappa,
         I_ext_time,

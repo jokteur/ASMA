@@ -52,7 +52,7 @@ def _fast_pde(
             + lambda_kappa * (np.sum(f * rho_t[s - 1] * da) * J + x_fixed)
         )
         m_t_sum = np.sum(exp_a * m_t[s], axis=1)
-        f = f_SRM(m_t_sum + x_t[s], tau=tau, c=c)
+        f = f_SRM(m_t_sum + x_t[s], c=c)
 
         # Copy previous density
         rho_t[s] = rho_t[s - 1]
@@ -150,7 +150,7 @@ def FR_finite_fluctuations(
 
 
 # Trigger compilation
-print("Compilation of flowrect with finite size fluctuations")
-ret = FR_finite_fluctuations(
-    time_end=0.5, dt=0.5, Lambda=[1, 1], Gamma=[-1, -1], c=1, lambda_kappa=1, a_cutoff=1
-)
+# print("Compilation of flowrect with finite size fluctuations")
+# ret = FR_finite_fluctuations(
+#     time_end=0.5, dt=0.5, Lambda=[1, 1], Gamma=[-1, -1], c=1, lambda_kappa=1, a_cutoff=1
+# )

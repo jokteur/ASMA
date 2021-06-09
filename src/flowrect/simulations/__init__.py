@@ -1,4 +1,5 @@
 from .pdes.FR import flow_rectification
+from .pdes.ASA1 import ASA1
 from .pdes.second_order import flow_rectification_2nd_order
 from .pdes.finite_pde import FR_finite_fluctuations
 from .particle.population import population as particle_population
@@ -13,6 +14,7 @@ __all__ = [
     "flow_rectification_2nd_order",
     "FR_finite_fluctuations",
     "particle_population",
+    "ASA1",
     "particle_population_fast",
     "particle_individual",
     "quasi_renewal",

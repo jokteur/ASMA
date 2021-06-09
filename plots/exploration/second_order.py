@@ -14,6 +14,7 @@ from flowrect.simulations import (
     particle_population,
     flow_rectification,
     flow_rectification_2nd_order,
+    ASA1,
     quasi_renewal,
 )
 
@@ -28,51 +29,51 @@ def moving_average(x, w):
 
 
 # Simulation parameters
-N = 500
+N = 5000
 dt = 1e-2
-I_ext = 5
 params = dict(
-    time_end=40,
+    time_end=15,
     dt=dt,
-    Lambda=np.array([1.0, 2.5]),
-    Gamma=np.array([-5.5, 1.0]),
-    # Lambda=np.array([28.0, 8.0, 1.0]),
-    # Gamma=np.array([-3.5, 3.0, -1.0]),
-    c=10,
-    lambda_kappa=2,
-    I_ext=2,
-    I_ext_time=20,
+    Lambda=np.array([10.3, 2.5]),
+    Gamma=np.array([-2.0, -1.0]),
+    c=20,
+    Delta=4,
+    lambda_kappa=100,
+    I_ext=1.5,
+    I_ext_time=7.5,
     interaction=0.0,
 )
 
-params["Gamma"] /= params["Lambda"]
+# params["Gamma"] /= params["Lambda"]
 
 a_cutoff = 7
 
-print(f"2nd order approx")
+print(f"Particle simulation")
 t = time.time()
-(
-    ts,
-    a_grid,
-    rho_t_2nd,
-    m_t_2nd,
-    n_t_2nd,
-    x_t_2nd,
-    en_cons_2nd,
-    A_t_2nd,
-) = flow_rectification_2nd_order(a_cutoff=a_cutoff, **params)
-print(f"{time.time() - t:.2f}s")
+# params["dt"] = 1e-3
+ts, M, spikes, A, X = particle_population(**params, N=N, Gamma_ext=True, use_LambdaGamma=True)
+m_tp = calculate_mt(M, spikes)
+m_t0 = m_tp[int(params["I_ext_time"] * dt)]
+# params["dt"] = 1e-2
+print(f"{time.time() - t:.2f}")
+
+# print(f"Integral")
+# t = time.time()
+# params["dt"] = 5e-2
+# integral_equation(1, 0.1, [1.0, 2.0], [-2.0, -1])
+# print("Compiled")
+# ts_int, m_t_int, A_t_int, h_t_int = integral_equation(
+#     a_cutoff=a_cutoff, use_LambdaGamma=True, **params
+# )
+# print(A_t_int)
+# params["dt"] = 1e-2
+# print(f"{time.time() - t:.2f}s")
 
 print(f"Quasi renewal")
 QR_params = copy.copy(params)
-QR_params["Gamma"] = np.array(params["Lambda"]) * np.array(params["Gamma"])
+# QR_params["Gamma"] = np.array(params["Lambda"]) * np.array(params["Gamma"])
 ts, A_QR, _ = quasi_renewal(use_LambdaGamma=True, **params)
 
-print(f"Particle simulation")
-t = time.time()
-ts, M, spikes, A, X = particle_population(**params, N=N, Gamma_ext=True, use_LambdaGamma=False)
-m_tp = calculate_mt(M, spikes)
-print(f"{time.time() - t:.2f}")
 
 print(f"Flow rectification approximation")
 t = time.time()
@@ -82,33 +83,90 @@ ts_1st, a_grid_1st, rho_t_1st, m_t_1st, x_t_1st, en_cons_1st, A_t_1st = flow_rec
 )
 print(f"{time.time() - t:.2f}s")
 
-# plt.figure()
-# plt.plot(ts, m_tp[0], "--k", label="particulaire")
-# plt.plot(ts, m_t_2nd[:, 0], "--r", label="2nd ordre")
-# plt.plot(ts_1st, m_t_1st[:, 0], "-b", label="ref 1er ordre")
-# plt.legend()
+
+print(f"ASA1")
+t = time.time()
+# params["dt"] = 1e-3
+(
+    ts_ASA1,
+    a_grid_ASA1,
+    rho_t_ASA1,
+    m_t_ASA1,
+    x_t_ASA1,
+    en_cons_ASA1,
+    A_t_ASA1,
+) = ASA1(a_cutoff=a_cutoff, use_LambdaGamma=True, **params)
+print(f"{time.time() - t:.2f}s")
 
 
-I_ext_vec = np.concatenate((np.zeros(int(len(ts) / 2)), I_ext * np.ones(int(len(ts) / 2))))
+def energy_conservation_plot(ax):
+    ax.plot(ts_ASA1, en_cons_ASA1, "--k")
+    ax.set_title("Energy conservation")
+    ax.set_xlabel("time t")
+
+
+def m_t_plot(ax):
+    ax.set_title("m_t")
+    ax.plot(ts, m_tp[:, 0], "--k", label="particulaire")
+    ax.plot(ts_1st, m_t_ASA1[:, 0], "--r", label="ASA1 v2")
+    ax.plot(ts_1st, m_t_1st[:, 0], "-b", label="FR")
+    ax.plot(ts, m_tp[:, 1], "--k")
+    ax.plot(ts_1st, m_t_ASA1[:, 1], "--r")
+    ax.plot(ts_1st, m_t_1st[:, 1], "-b")
+    ax.set_ylim(-30, 1)
+    ax.legend()
+
+
+def activity_plot(ax):
+    ax.set_title("Activity")
+    A_av = moving_average(A, 50)
+    ax.plot(ts, A, "--k", label="Particle")
+    ax.plot(ts[: len(A_av)], A_av, "--r", label="P. rolling av.")
+    ax.plot(ts_1st, A_t_1st, "-b", linewidth=1.5, label="1st")
+    ax.plot(ts_1st, A_QR, "-.m", linewidth=1.5, label="QR")
+    ax.plot(ts_ASA1, A_t_ASA1, "-.", linewidth=1.5, label="ASA1 v2")
+    # ax.plot(ts_int, A_t_int, "-.", linewidth=1.5, label="Integral")
+    # ax.plot(ts, A_t_2nd, "-g", linewidth=1.5, label="2nd")
+    ax.set_ylim(0, 10)
+    ax.legend()
+
+
+def interaction_plot(ax):
+    ax.set_title("h_t")
+    ax.plot(ts, X, "--k", label="Particle")
+    ax.plot(ts_1st, x_t_1st, "-b", linewidth=1.5, label="1st")
+    ax.plot(ts_ASA1, x_t_ASA1, "-.", linewidth=1.5, label="ASA1 v2")
+    ax.legend()
+
+
+I_ext_vec = np.concatenate(
+    (np.zeros(int(len(ts) / 2)), params["I_ext"] * np.ones(int(len(ts) / 2)))
+)
 ages = calculate_age(spikes.T) * params["dt"]
 A_av = moving_average(A, 100)
 
 # Animated plots
-
-
 class AnimatedPlot:
-    def __init__(self, xlim=10, ylim=10):
-        self.fig = plt.figure(figsize=(5.5, 9))
-        gs = gridspec.GridSpec(2, 1, height_ratios=[5, 1])
+    def __init__(self, xlim=10, ylim=20):
+        self.fig = plt.figure(figsize=(15, 8))
+        gs = gridspec.GridSpec(2, 3, height_ratios=[2, 1])
         self.fig.suptitle(fr"PDE vs particle simulation $N=${N}")
 
         self.ax1 = plt.subplot(gs[0])
         self.ax2 = plt.subplot(gs[1])
+        self.ax3 = plt.subplot(gs[2])
+        self.ax4 = plt.subplot(gs[3])
+        self.ax5 = plt.subplot(gs[4])
+        self.ax6 = plt.subplot(gs[5])
         self.xlim, self.ylim = xlim, ylim
+
+        energy_conservation_plot(self.ax5)
+        m_t_plot(self.ax2)
+        activity_plot(self.ax3)
+        interaction_plot(self.ax6)
         self.plots = {}
 
     def init_plot(self):
-
         self.plots["title"] = self.ax1.text(
             0.5,
             0.85,
@@ -119,25 +177,27 @@ class AnimatedPlot:
         )
 
         # density plot (PDE)
-        self.plots["p_rho"] = self.ax1.plot([], [], "-k", label="Particle")[0]
-        self.plots["rho"] = self.ax1.plot(a_grid, rho_t[0], "--r", linewidth=1, label="PDE")[0]
+        # self.plots["p_rho"] = self.ax1.plot([], [], "-k", label="Particle")[0]
+        self.plots["rho"] = self.ax1.plot(
+            a_grid_1st, rho_t_1st[0], "--r", linewidth=1, label="1st"
+        )[0]
         self.plots["rho2nd"] = self.ax1.plot(
-            a_grid, rho_t_2nd[0], "-b", linewidth=1, label="Finite"
+            a_grid_ASA1, rho_t_ASA1[0], "-b", linewidth=1, label="ASA1"
         )[0]
         # self.plots["S"] = self.ax1.plot(a_grid, S[0], "g", linewidth=1)[0]
-        self.ax1.set_ylim(0, 4)
+        self.ax1.set_ylim(0, 10)
         self.ax1.set_title("Probability density distribution")
-        self.ax1.legend(handles=[self.plots["rho"], self.plots["p_rho"], self.plots["rho2nd"]])
+        self.ax1.legend(handles=self.plots.values())
         self.ax1.set_xlabel("Age a (s)")
         self.ax1.set_ylabel(r"$\rho_t$")
 
-        self.ax2.plot()
-        self.ax2.set_title("External input")
-        self.plots["vline"] = self.ax2.plot([], [], "-r", linewidth=1)[0]
-        self.ax2.set_ylim(0, 6)
-        self.ax2.plot(ts, I_ext_vec, "-k")
-        self.ax2.set_ylabel(r"$I^{ext}$ (a.u.)")
-        self.ax2.set_xlabel(r"$t$ (s)")
+        self.ax4.plot()
+        self.ax4.set_title("External input")
+        self.plots["vline"] = self.ax4.plot([], [], "-r", linewidth=1)[0]
+        self.ax4.set_ylim(0, 6)
+        self.ax4.plot(ts, I_ext_vec, "-k")
+        self.ax4.set_ylabel(r"$I^{ext}$ (a.u.)")
+        self.ax4.set_xlabel(r"$t$ (s)")
 
         return tuple(self.plots.values())
 
@@ -153,12 +213,12 @@ class AnimatedPlot:
         self.plots["title"].set_text(fr"Time $t=${t:.2f}s")
         # Particule rho
         bins, hist = self.calculate_hist(i)
-        self.plots["p_rho"].set_data(bins, hist)
+        # self.plots["p_rho"].set_data(bins, hist)
         self.plots["vline"].set_data(np.array([t, t]), np.array([0, 6]))
 
         # PDE rho
-        self.plots["rho"].set_data(a_grid, rho_t[i])
-        self.plots["rho2nd"].set_data(a_grid, rho_t_2nd[i])
+        self.plots["rho"].set_data(a_grid_1st, rho_t_1st[i])
+        self.plots["rho2nd"].set_data(a_grid_ASA1, rho_t_ASA1[i])
         # self.plots["S"].set_data(a_grid, S[i])
         return tuple(self.plots.values())
 
@@ -181,13 +241,4 @@ print(anim_int)
 if save:
     ani.save(os.path.join(save_path, save_name))
 
-plt.figure()
-A_av = moving_average(A, 50)
-plt.plot(ts, A, "--k", label="Particle")
-plt.plot(ts[: len(A_av)], A_av, "--r", label="P. rolling av.")
-plt.plot(ts_1st, A_t_1st, "-b", linewidth=1.5, label="1st")
-plt.plot(ts, A_QR, "-.m", linewidth=1.5, label="QR")
-plt.plot(ts, A_t_2nd, "-g", linewidth=1.5, label="2nd")
-plt.ylim(0, 10)
-plt.legend()
 plt.show()

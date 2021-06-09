@@ -64,12 +64,12 @@ def _fast_QR(
     A[0] = 1 / dt
 
     # Fixed vectors
-    eta = eta_SRM(np.linspace(tau_c, 0, K), Gamma, Lambda, use_LambdaGamma)
-    y = np.exp(eta_SRM(np.linspace(2 * tau_c, 0, 2 * K), Gamma, Lambda, use_LambdaGamma)) - 1
+    eta = eta_SRM(np.linspace(tau_c, 0, K), Gamma, Lambda)
+    y = np.exp(eta_SRM(np.linspace(2 * tau_c, 0, 2 * K), Gamma, Lambda)) - 1
 
     # Use conventions as in article
     for s in range(1, steps):
-        x_fixed = I_ext if I_ext_time < dt * s else 0
+        x_fixed = I_ext if I_ext_time < dt * (s - 1) else 0
         t = dt * s
         grid_t = np.linspace(t - tau_c, t, K)
 
@@ -89,7 +89,7 @@ def _fast_QR(
             x[k] = np.exp(eta[k] + yA * dt)
 
         # Update kappa
-        h_int = h_int + dt * (-lambda_kappa * h_int + lambda_kappa * (J * A[s - 1] + x_fixed))
+        h_int = h_int + dt * lambda_kappa * (-h_int + (J * A[s - 1] + x_fixed))
 
         m[K - 1] = A[s - 1] * dt
         for k in list(range(0, K - 1))[::-1]:
@@ -109,11 +109,13 @@ def quasi_renewal(
     dt,
     Lambda,
     Gamma,
-    c,
-    interaction,
-    lambda_kappa,
-    I_ext,
-    I_ext_time,
+    c=1,
+    Delta=1,
+    theta=0,
+    interaction=0,
+    lambda_kappa=20,
+    I_ext_time=0,
+    I_ext=0,
     epsilon_c=1e-2,
     use_LambdaGamma=False,
 ):

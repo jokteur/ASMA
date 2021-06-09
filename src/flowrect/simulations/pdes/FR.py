@@ -5,9 +5,21 @@ from numba import jit, prange
 from ..util import f_SRM
 
 # Not used
-@jit(nopython=True, cache=True)
+# @jit(nopython=True, cache=True)
 def _fast_pde(
-    time_end, dt, a_grid_size, exp_a, Gamma, c, lambda_kappa, I_ext, I_ext_time, interaction, m_t0=0
+    time_end,
+    dt,
+    a_grid_size,
+    exp_a,
+    Gamma,
+    c,
+    Delta,
+    theta,
+    lambda_kappa,
+    I_ext,
+    I_ext_time,
+    interaction,
+    m_t0=0,
 ):
     """"""
     steps = int(time_end / dt)
@@ -18,7 +30,7 @@ def _fast_pde(
     rho_t = np.zeros((steps, a_grid_size))
     m_t = np.zeros((steps, dim))
     m_t[0] = m_t0
-    x_t = np.zeros(steps)
+    h_t = np.zeros(steps)
 
     rho_t[0, 0] = 1 / dt
     # interaction = J from our equations
@@ -28,21 +40,20 @@ def _fast_pde(
     # Initial step
     x_fixed = I_ext if I_ext_time == 0 else 0
     m_t_sum = np.sum(exp_a * m_t[0], axis=1)
-    f = f_SRM(m_t_sum + x_t[0], c=c)
+    f = f_SRM(m_t_sum + h_t[0], c=c)
 
     for s in range(1, steps):
-        x_fixed = I_ext if I_ext_time < dt * s else 0
+        x_fixed = I_ext if I_ext_time < dt * (s - 1) else 0
 
         m_t[s] = m_t[s - 1] + dt * np.sum(
             (Gamma - (1 - exp_a) * m_t[s - 1]).T * f * rho_t[s - 1] * da, axis=1
         )
-        x_t[s] = x_t[s - 1] + dt * (
-            -lambda_kappa * x_t[s - 1]
-            + lambda_kappa * (np.sum(f * rho_t[s - 1] * da) * J + x_fixed)
+        h_t[s] = h_t[s - 1] + dt * lambda_kappa * (
+            -h_t[s - 1] + (np.sum(f * rho_t[s - 1] * da) * J + x_fixed)
         )
         m_t_sum = np.sum(exp_a * m_t[s], axis=1)
         # m_t_sum = np.sum(exp_a * m_ts[s], axis=1)
-        f = f_SRM(m_t_sum + x_t[s], c=c)
+        f = f_SRM(m_t_sum + h_t[s], c=c, Delta=Delta, theta=theta)
 
         rho_t[s] = rho_t[s - 1]
         # Mass loss
@@ -57,7 +68,95 @@ def _fast_pde(
         # Mass insertion
         rho_t[s, 0] = np.sum(mass_transfer) + lass_cell_mass
 
-    return ts, rho_t, m_t, x_t
+    return ts, rho_t, m_t, h_t
+
+
+def integral_equation(
+    time_end,
+    dt,
+    Lambda,
+    Gamma,
+    c=1,
+    Delta=1,
+    theta=0,
+    interaction=0,
+    lambda_kappa=20,
+    I_ext_time=0,
+    I_ext=0,
+    a_cutoff=5,
+    use_LambdaGamma=False,
+    m_t0=0,
+):
+    """"""
+
+    if isinstance(Gamma, (float, int)):
+        Gamma = [Gamma]
+    if isinstance(Lambda, (float, int)):
+        Lambda = [Lambda]
+
+    Gamma = np.array(Gamma)
+    Lambda = np.array(Lambda)
+
+    if use_LambdaGamma:
+        Gamma = Gamma * Lambda
+
+    steps = int(time_end / dt)
+    dim = Gamma.shape[0]
+
+    # Init vectors
+    ts = np.linspace(0, time_end, steps)
+    A_t = np.zeros(steps)
+    m_t = np.zeros((steps, dim))
+    h_t = np.zeros(steps)
+
+    # interaction = J from our equations
+    J = interaction
+    da = dt
+
+    f_SRM_args = dict(c=c, Delta=Delta, theta=theta)
+
+    @jit(nopython=True, cache=True)
+    def optimized(A_t, m_t, h_t):
+        for n in range(1, steps - 1):
+            x_fixed = I_ext if I_ext_time < dt * n else 0
+
+            P_mn = np.zeros(n)
+            t_n = dt * n
+            for i in range(n):
+                t_i = dt * i
+                exp_sum = 0.0
+                for s in range(i, n):
+                    t_s = dt * s
+                    exp_sum += (
+                        f_SRM(
+                            np.sum(np.exp(-Lambda * (t_s - t_i)) * m_t[i] + h_t[s]),
+                            c=c,
+                            Delta=Delta,
+                            theta=theta,
+                        )
+                        * dt
+                    )
+                P_mn[i] = f_SRM(
+                    np.sum(np.exp(-Lambda * (t_n - t_i)) * m_t[i] + h_t[s]) * np.exp(exp_sum),
+                    c=c,
+                    Delta=Delta,
+                    theta=theta,
+                )
+            for i in range(n):
+                A_t[n + 1] += P_mn[i] * A_t[i] * dt
+                m_t[n + 1] += (
+                    (np.exp(-Lambda * (t_n - t_i)) * m_t[i] + Gamma) * P_mn[i] * A_t[i] / A_t[n]
+                )
+
+            h_t[n + 1] = h_t[n] + dt * (-lambda_kappa * h_t[n] + (A_t[n] * J + x_fixed))
+
+            if n % 10 == 0:
+                print("Time step", n)
+        return A_t, m_t, h_t
+
+    A_t, m_t, h_t = optimized(A_t, m_t, h_t)
+
+    return ts, m_t, A_t, h_t
 
 
 def flow_rectification(
@@ -65,11 +164,13 @@ def flow_rectification(
     dt,
     Lambda,
     Gamma,
-    c,
-    interaction,
-    lambda_kappa,
-    I_ext,
-    I_ext_time,
+    c=1,
+    Delta=1,
+    theta=0,
+    interaction=0,
+    lambda_kappa=20,
+    I_ext_time=0,
+    I_ext=0,
     a_cutoff=5,
     use_LambdaGamma=False,
     m_t0=0,
@@ -168,6 +269,8 @@ def flow_rectification(
         exp_a,
         Gamma,
         c,
+        Delta,
+        theta,
         lambda_kappa,
         I_ext,
         I_ext_time,

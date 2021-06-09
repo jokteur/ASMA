@@ -14,8 +14,8 @@ use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Mutex;
 
 #[allow(non_snake_case)]
-fn f_SRM(x: f64, c: f64) -> f64 {
-    c * f64::exp(x)
+fn f_SRM(x: f64, c: f64, Delta: f64, theta: f64) -> f64 {
+    c * f64::exp((x - theta) / Delta)
 }
 
 #[pyfunction]
@@ -26,6 +26,8 @@ fn particle_population_py<'py>(
     gamma: PyReadonlyArrayDyn<f64>,
     lambda: PyReadonlyArrayDyn<f64>,
     c: f64,
+    Delta: f64,
+    theta: f64,
     j: f64,
     lambda_kappa: f64,
     i_ext_time: f64,
@@ -61,7 +63,7 @@ fn particle_population_py<'py>(
             .into_par_iter()
             .enumerate()
             .for_each(|(index, mut val)| {
-                if 1. - f_SRM(-dt * f64::exp(val.sum() + x_t[s - 1]), c) > noise[index] {
+                if 1. - f_SRM(-dt * f64::exp(val.sum() + x_t[s - 1]), c, Delta, theta) > noise[index] {
                     val += &gamma;
                     let mut av = m_t_av.lock().unwrap();
                     *av += &val;

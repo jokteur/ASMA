@@ -56,12 +56,12 @@ calculate_mt(np.zeros((10, 5, 2)), np.zeros((10, 5)))
 
 
 @jit(nopython=True, nogil=True)
-def f_SRM(x, tau=1, c=1):
-    return np.exp(x / tau) * c
+def f_SRM(x, c=1, Delta=1, theta=0):
+    return np.exp((x - theta) / Delta) * c
 
 
 @jit(nopython=True)
-def eta_SRM(x, Gamma, Lambda, use_LambdaGamma=False, tau=1):
+def eta_SRM(x, Gamma, Lambda, tau=1):
     ret = np.zeros(len(x))
     for d in range(len(Gamma)):
         ret += Gamma[d] * np.exp(-Lambda[d] * x)
