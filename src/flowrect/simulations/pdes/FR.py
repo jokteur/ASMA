@@ -9,6 +9,7 @@ from ..util import f_SRM
 def _fast_pde(
     time_end,
     dt,
+    a_grid,
     a_grid_size,
     exp_a,
     Gamma,
@@ -43,7 +44,7 @@ def _fast_pde(
     f = f_SRM(m_t_sum + h_t[0], c=c)
 
     for s in range(1, steps):
-        x_fixed = I_ext if I_ext_time < dt * (s - 1) else 0
+        x_fixed = I_ext if I_ext_time < dt * s else 0
 
         m_t[s] = m_t[s - 1] + dt * np.sum(
             (Gamma - (1 - exp_a) * m_t[s - 1]).T * f * rho_t[s - 1] * da, axis=1
@@ -265,6 +266,7 @@ def flow_rectification(
     ts, rho_t, m_t, x_t = _fast_pde(
         time_end,
         dt,
+        a_grid,
         a_grid_size,
         exp_a,
         Gamma,

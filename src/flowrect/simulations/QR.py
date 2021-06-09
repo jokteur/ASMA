@@ -69,7 +69,7 @@ def _fast_QR(
 
     # Use conventions as in article
     for s in range(1, steps):
-        x_fixed = I_ext if I_ext_time < dt * (s - 1) else 0
+        x_fixed = I_ext if I_ext_time < dt * s else 0
         t = dt * s
         grid_t = np.linspace(t - tau_c, t, K)
 

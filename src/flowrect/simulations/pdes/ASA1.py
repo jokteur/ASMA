@@ -1,6 +1,7 @@
 import numpy as np
 import time
 from numba import jit, prange
+import matplotlib.pyplot as plt
 
 from ..util import f_SRM
 
@@ -20,6 +21,8 @@ def ASA1(
     a_cutoff=5,
     use_LambdaGamma=True,
     m_t0=0,
+    rho0=0,
+    h_t0=0,
 ):
     """"""
     if isinstance(Gamma, (float, int)):
@@ -48,63 +51,74 @@ def ASA1(
 
     # Init vectors
     ts = np.linspace(0, time_end, steps)
+    A_t = np.zeros(steps)
     rho_t = np.zeros((steps, a_grid_size))
     m_t = np.zeros((steps, dim))
     m_t[0] = m_t0
     h_t = np.zeros(steps)
 
     rho_t[0, 0] = 1 / dt
+    h_t[0] = h_t0
+
+    if isinstance(rho0, np.ndarray):
+        rho_t[0] = rho0
+
     # interaction = J from our equations
     J = interaction
     da = dt
 
     f_SRM_args = dict(c=c, Delta=Delta, theta=theta)
 
-    # Initial step
-    x_fixed = I_ext if I_ext_time == 0 else 0
-    m_t_sum = np.sum(exp_La * m_t[0], axis=1)
-    f = f_SRM(m_t_sum + h_t[0], c=c)
+    a_iplusone = np.exp(-Lambda * dt)
+    # a_iplusone = 1
 
-    g = np.zeros(steps)
+    # @jit(nopython=True, cache=True)
 
-    # a_iplusone = np.exp(-Lambda * dt)
-    a_iplusone = 1
+    def optimized(rho_t, m_t, h_t):
+        for s in range(0, steps - 1):
+            x_fixed = I_ext if I_ext_time < dt * (s + 1) else 0
 
-    for s in range(0, steps - 1):
-        x_fixed = I_ext if I_ext_time < dt * s else 0
+            num_age_steps = min(s, a_grid_size)
 
-        num_age_steps = min(s, a_grid_size)
-        exp_m_t = np.zeros((a_grid_size, dim))
-        decay_m_t = np.zeros((a_grid_size, dim))
+            # A_t = rho_t[s, 0]
+            # if A_t < 1e-5:
+            #     A_t = 1e-5
+            #     print("Low activity at step", s, ":", A_t)
 
-        A_t = rho_t[s, 0]
-        if A_t < 1e-5:
-            A_t = 1e-5
-            print(f"Low activity at step {s}, {A_t=}")
+            indices = s - np.arange(num_age_steps)
+            m0 = m_t0 * np.ones((a_grid_size - num_age_steps, dim))
+            m = np.concatenate((m_t[indices], m0), axis=0)
+            exp_m_t = exp_La * m
 
-        for i in range(num_age_steps):
-            exp_m_t[i] = exp_La[i] * m_t[s - i]
+            f = f_SRM(np.sum(exp_m_t, axis=1) + h_t[s], c=c, Delta=Delta, theta=theta)
 
-        f = f_SRM(np.sum(exp_m_t, axis=1) + h_t[s], **f_SRM_args)
+            # firing_prob = np.zeros(a_grid_size)
+            # for i in range(a_grid_size):
+            #     firing_prob[i] = f[i] if i < 1 else 1
+            firing_prob = np.clip(f * da, 0, 1)
 
-        firing_prob = np.clip(f * da, 0, 1)
+            A_t[s] = np.sum(f * rho_t[s] * da)
 
-        m_t[s + 1] = np.sum((a_iplusone * exp_m_t + Gamma).T * firing_prob * rho_t[s], axis=1) / A_t
+            m_t[s + 1] = (
+                np.sum((a_iplusone * exp_m_t + Gamma).T * firing_prob * rho_t[s], axis=1) / A_t[s]
+            )
 
-        h_t[s + 1] = h_t[s] + dt * lambda_kappa * (
-            -h_t[s] + (np.sum(f * rho_t[s]) * da * J + x_fixed)
-        )
+            h_t[s + 1] = h_t[s] + dt * lambda_kappa * (-h_t[s] + (A_t[s] * J + x_fixed))
 
-        # Mass loss
-        mass_transfer = rho_t[s] * firing_prob
-        # rho_t[s + 1] -= mass_transfer
-        lass_cell_mass = rho_t[s, -1]  # Last cell necessarely spikes
+            # Mass loss
+            mass_transfer = rho_t[s] * firing_prob
+            # rho_t[s + 1] -= mass_transfer
+            lass_cell_mass = rho_t[s, -1]  # Last cell necessarely spikes
 
-        # Linear transport
-        rho_t[s + 1, 1:] = rho_t[s, :-1] - mass_transfer[:-1]
+            # Linear transport
+            rho_t[s + 1, 1:] = rho_t[s, :-1] - mass_transfer[:-1]
 
-        # Mass insertion
-        rho_t[s + 1, 0] = np.sum(mass_transfer) + lass_cell_mass
+            # Mass insertion
+            rho_t[s + 1, 0] = np.sum(mass_transfer) + lass_cell_mass
+
+        return rho_t, m_t, h_t
+
+    rho_t, m_t, h_t = optimized(rho_t, m_t, h_t)
 
     mass_conservation = np.sum(rho_t * dt, axis=-1)
     activity = rho_t[:, 0]

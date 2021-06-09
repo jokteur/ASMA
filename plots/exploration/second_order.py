@@ -28,6 +28,13 @@ def moving_average(x, w):
     return np.convolve(x, np.ones(w), "valid") / w
 
 
+def calculate_hist(ages, i):
+    hist, bins = np.histogram(ages[:, i], bins=50, density=True)
+    bins = (bins[1:] + bins[:-1]) / 2
+    # w = 2
+    return bins, hist  # moving_average(hist, w)
+
+
 # Simulation parameters
 N = 5000
 dt = 1e-2
@@ -38,22 +45,30 @@ params = dict(
     Gamma=np.array([-2.0, -1.0]),
     c=20,
     Delta=4,
-    lambda_kappa=100,
-    I_ext=1.5,
+    lambda_kappa=2,
+    I_ext=5.5,
     I_ext_time=7.5,
     interaction=0.0,
 )
 
 # params["Gamma"] /= params["Lambda"]
 
-a_cutoff = 7
+a_cutoff = 5
 
 print(f"Particle simulation")
 t = time.time()
 # params["dt"] = 1e-3
-ts, M, spikes, A, X = particle_population(**params, N=N, Gamma_ext=True, use_LambdaGamma=True)
+ts, M, spikes, A, H = particle_population(**params, N=N, Gamma_ext=True, use_LambdaGamma=True)
 m_tp = calculate_mt(M, spikes)
-m_t0 = m_tp[int(params["I_ext_time"] * dt)]
+before_spike = int(params["I_ext_time"] / dt) - 10
+m_t0 = m_tp[before_spike]
+h_t0 = H[before_spike]
+
+I_ext_vec = np.concatenate(
+    (np.zeros(int(len(ts) / 2)), params["I_ext"] * np.ones(int(len(ts) / 2)))
+)
+ages = calculate_age(spikes.T) * params["dt"]
+A_av = moving_average(A, 100)
 # params["dt"] = 1e-2
 print(f"{time.time() - t:.2f}")
 
@@ -86,16 +101,14 @@ print(f"{time.time() - t:.2f}s")
 
 print(f"ASA1")
 t = time.time()
-# params["dt"] = 1e-3
-(
-    ts_ASA1,
-    a_grid_ASA1,
-    rho_t_ASA1,
-    m_t_ASA1,
-    x_t_ASA1,
-    en_cons_ASA1,
-    A_t_ASA1,
-) = ASA1(a_cutoff=a_cutoff, use_LambdaGamma=True, **params)
+(ts_ASA1, a_grid_ASA1, rho_t_ASA1, m_t_ASA1, x_t_ASA1, en_cons_ASA1, A_t_ASA1,) = ASA1(
+    a_cutoff=a_cutoff,
+    rho0=rho_t_1st[before_spike],
+    h_t0=h_t0,
+    m_t0=m_t0,
+    use_LambdaGamma=True,
+    **params,
+)
 print(f"{time.time() - t:.2f}s")
 
 
@@ -120,10 +133,10 @@ def m_t_plot(ax):
 def activity_plot(ax):
     ax.set_title("Activity")
     A_av = moving_average(A, 50)
-    ax.plot(ts, A, "--k", label="Particle")
+    ax.plot(ts, A, "--k", label="Particle", alpha=0.1)
     ax.plot(ts[: len(A_av)], A_av, "--r", label="P. rolling av.")
-    ax.plot(ts_1st, A_t_1st, "-b", linewidth=1.5, label="1st")
-    ax.plot(ts_1st, A_QR, "-.m", linewidth=1.5, label="QR")
+    # ax.plot(ts_1st, A_t_1st, "-b", linewidth=1.5, label="1st")
+    # ax.plot(ts_1st, A_QR, "-.m", linewidth=1.5, label="QR")
     ax.plot(ts_ASA1, A_t_ASA1, "-.", linewidth=1.5, label="ASA1 v2")
     # ax.plot(ts_int, A_t_int, "-.", linewidth=1.5, label="Integral")
     # ax.plot(ts, A_t_2nd, "-g", linewidth=1.5, label="2nd")
@@ -133,17 +146,11 @@ def activity_plot(ax):
 
 def interaction_plot(ax):
     ax.set_title("h_t")
-    ax.plot(ts, X, "--k", label="Particle")
-    ax.plot(ts_1st, x_t_1st, "-b", linewidth=1.5, label="1st")
+    ax.plot(ts, H, "--k", label="Particle")
+    ax.plot(ts_1st, x_t_1st, "--b", linewidth=1.5, label="1st")
     ax.plot(ts_ASA1, x_t_ASA1, "-.", linewidth=1.5, label="ASA1 v2")
     ax.legend()
 
-
-I_ext_vec = np.concatenate(
-    (np.zeros(int(len(ts) / 2)), params["I_ext"] * np.ones(int(len(ts) / 2)))
-)
-ages = calculate_age(spikes.T) * params["dt"]
-A_av = moving_average(A, 100)
 
 # Animated plots
 class AnimatedPlot:
@@ -201,18 +208,12 @@ class AnimatedPlot:
 
         return tuple(self.plots.values())
 
-    def calculate_hist(self, i):
-        hist, bins = np.histogram(ages[:, i], bins=50, density=True)
-        bins = (bins[1:] + bins[:-1]) / 2
-        # w = 2
-        return bins, hist  # moving_average(hist, w)
-
     def animate(self, i):
         t = dt * i
         # Scatter
         self.plots["title"].set_text(fr"Time $t=${t:.2f}s")
         # Particule rho
-        bins, hist = self.calculate_hist(i)
+        bins, hist = calculate_hist(ages, i)
         # self.plots["p_rho"].set_data(bins, hist)
         self.plots["vline"].set_data(np.array([t, t]), np.array([0, 6]))
 
@@ -227,7 +228,7 @@ class AnimatedPlot:
 lim = 20
 pl = AnimatedPlot(xlim=lim, ylim=lim)
 anim_int = 4  # Want every 10ms
-print(anim_int)
+# print(anim_int)
 
 # ani = animation.FuncAnimation(
 #     pl.fig,

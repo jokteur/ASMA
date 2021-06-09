@@ -42,7 +42,7 @@ def _simulation_slow(
 
     # If True, jumps by Lambda*Gamma instead of Lambda
     for s in range(1, steps):
-        x_fixed = I_ext if I_ext_time < dt * (s - 1) else 0
+        x_fixed = I_ext if I_ext_time < dt * s else 0
 
         activation = (
             1
