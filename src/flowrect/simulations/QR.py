@@ -37,6 +37,8 @@ def _fast_QR(
     Lambda,
     Gamma,
     c,
+    Delta,
+    theta,
     lambda_kappa,
     I_ext,
     I_ext_time,
@@ -64,8 +66,8 @@ def _fast_QR(
     A[0] = 1 / dt
 
     # Fixed vectors
-    eta = eta_SRM(np.linspace(tau_c, 0, K), Gamma, Lambda)
-    y = np.exp(eta_SRM(np.linspace(2 * tau_c, 0, 2 * K), Gamma, Lambda)) - 1
+    eta = 1 / Delta * eta_SRM(np.linspace(tau_c, 0, K), Gamma, Lambda)
+    y = np.exp(1 / Delta * eta_SRM(np.linspace(2 * tau_c, 0, 2 * K), Gamma, Lambda)) - 1
 
     # Use conventions as in article
     for s in range(1, steps):
@@ -86,7 +88,7 @@ def _fast_QR(
                 idx = s - 1 - 2 * K + j  # Corresponding real index
                 if idx >= 0:  # Take into account only positive indices
                     yA += y[j] * A[idx]
-            x[k] = np.exp(eta[k] + yA * dt)
+            x[k] = np.exp(eta[k] + yA * dt - theta)
 
         # Update kappa
         h_int = h_int + dt * lambda_kappa * (-h_int + (J * A[s - 1] + x_fixed))
@@ -96,7 +98,7 @@ def _fast_QR(
             m[k] = prev_m[k + 1] * np.exp(-dt * c * np.exp(h_int) * x[k + 1])
 
         # Update A
-        A[s] = c * np.exp(h_int) * (1 + np.dot(x - 1, m))
+        A[s] = c * np.exp(h_int / Delta) * (1 + np.dot(x - 1, m))
 
         # Prepare m for next loop
         prev_m = m
@@ -184,6 +186,8 @@ def quasi_renewal(
     tau_c = find_cutoff(0, 100, dt, Lambda, Gamma, epsilon_c)
     tau_c = np.round(tau_c, decimals=int(-np.log10(dt)))
 
+    tau_c = 7
+
     return (
         *_fast_QR(
             time_end,
@@ -191,6 +195,8 @@ def quasi_renewal(
             Lambda,
             Gamma,
             c,
+            Delta,
+            theta,
             lambda_kappa,
             I_ext,
             I_ext_time,

@@ -57,7 +57,7 @@ calculate_mt(np.zeros((10, 5, 2)), np.zeros((10, 5)))
 
 @jit(nopython=True, nogil=True)
 def f_SRM(x, c=1, Delta=1, theta=0):
-    return np.exp((x - theta) / Delta) * c
+    return np.exp(x / Delta) * c
 
 
 @jit(nopython=True)
@@ -69,8 +69,26 @@ def eta_SRM(x, Gamma, Lambda, tau=1):
 
 
 @jit(nopython=True)
+def eta_SRM_no_vector(x, Gamma, Lambda, tau=1):
+    ret = 0
+    for d in range(len(Gamma)):
+        ret += Gamma[d] * np.exp(-Lambda[d] * x)
+    return ret
+
+
+@jit(nopython=True)
 def kappa_interaction(t, lambda_kappa, strength):
     return strength * np.exp(-lambda_kappa * t)
+
+
+def h_exp_update(h_t, A_t, I_ext, lambda_kappa, dt, J):
+    return h_t + lambda_kappa * dt * (J * A_t + I_ext - h_t)
+
+
+def h_erlang_update(h_t, k_t, A_t, I_ext, lambda_kappa, dt, J):
+    h = h_t + dt * lambda_kappa * (-h_t + k_t)
+    k = k_t + dt * lambda_kappa * (-k_t + J * A_t + I_ext)
+    return h, k
 
 
 @overload(np.clip)

@@ -3,7 +3,7 @@ import time
 from numba import jit, prange
 import matplotlib.pyplot as plt
 
-from ..util import f_SRM
+from ..util import f_SRM, h_exp_update, h_erlang_update
 
 
 def ASA1(
@@ -23,6 +23,7 @@ def ASA1(
     m_t0=0,
     rho0=0,
     h_t0=0,
+    kappa_type="exp",
 ):
     """"""
     if isinstance(Gamma, (float, int)):
@@ -54,12 +55,12 @@ def ASA1(
     A_t = np.zeros(steps)
     rho_t = np.zeros((steps, a_grid_size))
     m_t = np.zeros((steps, dim))
-    m_t[0] = m_t0
     h_t = np.zeros(steps)
+    k_t = np.zeros(steps)
 
+    m_t[0] = m_t0
     rho_t[0, 0] = 1 / dt
     h_t[0] = h_t0
-
     if isinstance(rho0, np.ndarray):
         rho_t[0] = rho0
 
@@ -67,10 +68,14 @@ def ASA1(
     J = interaction
     da = dt
 
+    c = c * np.exp(-theta / Delta)
     f_SRM_args = dict(c=c, Delta=Delta, theta=theta)
 
     a_iplusone = np.exp(-Lambda * dt)
+
     # a_iplusone = 1
+
+    h_args = dict(J=J, lambda_kappa=lambda_kappa, dt=dt)
 
     # @jit(nopython=True, cache=True)
 
@@ -97,13 +102,17 @@ def ASA1(
             #     firing_prob[i] = f[i] if i < 1 else 1
             firing_prob = np.clip(f * da, 0, 1)
 
-            A_t[s] = np.sum(f * rho_t[s] * da)
+            A_t[s] = np.sum(firing_prob * rho_t[s])
 
             m_t[s + 1] = (
                 np.sum((a_iplusone * exp_m_t + Gamma).T * firing_prob * rho_t[s], axis=1) / A_t[s]
             )
 
-            h_t[s + 1] = h_t[s] + dt * lambda_kappa * (-h_t[s] + (A_t[s] * J + x_fixed))
+            if kappa_type == "erlang":
+                h_t[s + 1], k_t[s + 1] = h_erlang_update(h_t[s], k_t[s], A_t[s], x_fixed, **h_args)
+            else:
+                h_t[s + 1] = h_exp_update(h_t[s], A_t[s], x_fixed, **h_args)
+            # h_t[s + 1] = h_t[s] + dt * lambda_kappa * (-h_t[s] + (A_t[s] * J + x_fixed))
 
             # Mass loss
             mass_transfer = rho_t[s] * firing_prob
@@ -116,10 +125,12 @@ def ASA1(
             # Mass insertion
             rho_t[s + 1, 0] = np.sum(mass_transfer) + lass_cell_mass
 
+        print(k_t)
         return rho_t, m_t, h_t
 
     rho_t, m_t, h_t = optimized(rho_t, m_t, h_t)
+    A_t[-1] = rho_t[-1, 0]
 
     mass_conservation = np.sum(rho_t * dt, axis=-1)
     activity = rho_t[:, 0]
-    return ts, a_grid, rho_t, m_t, h_t, mass_conservation, activity
+    return ts, a_grid, rho_t, m_t, h_t, mass_conservation, A_t

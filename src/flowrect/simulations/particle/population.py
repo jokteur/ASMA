@@ -2,7 +2,7 @@ import numpy as np
 import time
 from numba import jit, prange
 
-from ..util import f_SRM, eta_SRM
+from ..util import f_SRM, eta_SRM, h_exp_update, h_erlang_update
 from ...accelerated import population as _rust_population
 
 
@@ -20,6 +20,7 @@ def _simulation_slow(
     I_ext,
     N,
     M0,
+    kappa_type,
 ):
 
     steps = int(time_end / dt)
@@ -37,8 +38,12 @@ def _simulation_slow(
 
     M = np.zeros((steps, N, dim))
     H = np.zeros(steps)
+    K = np.zeros(steps)
     A = np.zeros(steps)
     # M[0] = np.tile(M0, (N, 1))
+
+    h_args = dict(J=J, lambda_kappa=lambda_kappa, dt=dt)
+    c = c * np.exp(-theta / Delta)
 
     # If True, jumps by Lambda*Gamma instead of Lambda
     for s in range(1, steps):
@@ -58,7 +63,12 @@ def _simulation_slow(
 
         spikes[s, activation] = 1
         A[s] = 1 / N * np.count_nonzero(activation) / dt
-        H[s] = H[s - 1] + dt * lambda_kappa * (-H[s - 1] + (J * A[s] + x_fixed))
+
+        if kappa_type == "erlang":
+            H[s], K[s] = h_erlang_update(H[s - 1], K[s - 1], A[s], x_fixed, **h_args)
+        else:
+            H[s] = h_exp_update(H[s - 1], A[s - 1], x_fixed, **h_args)
+        # H[s] = H[s - 1] + dt * lambda_kappa * (-H[s - 1] + (J * A[s] + x_fixed))
 
     return ts, M, spikes, A, H
 
@@ -79,6 +89,7 @@ def population_nomemory(
     M0=0,
     use_LambdaGamma=False,
     Gamma_ext=True,
+    kappa_type="exp",
 ):
     if isinstance(Gamma, (float, int)):
         Gamma = [Gamma]
@@ -100,6 +111,7 @@ def population_nomemory(
     dim = Gamma.shape[0]
 
     J = interaction
+    c = c * np.exp(-theta / Delta)
 
     Gamma = np.tile(Gamma, (N, 1))
     Lambda = np.tile(Lambda, (N, 1))
@@ -110,7 +122,10 @@ def population_nomemory(
     m_t = np.zeros((steps, dim))
     n_t = np.zeros((steps, dim, dim))
     H = np.zeros(steps)
+    K = np.zeros(steps)
     A = np.zeros(steps)
+
+    h_args = dict(J=J, lambda_kappa=lambda_kappa, dt=dt)
     # M[0] = np.tile(M0, (N, 1))
 
     # If True, jumps by Lambda*Gamma instead of Lambda
@@ -135,7 +150,11 @@ def population_nomemory(
             m_t[s] = m_t[s - 1]
         n_t[s] = np.outer(m_t[s], m_t[s])
         A[s] = 1 / N * np.count_nonzero(activation) / dt
-        H[s] = H[s - 1] + dt * lambda_kappa * (-H[s - 1] + (J * A[s] + x_fixed))
+
+        if kappa_type == "erlang":
+            H[s], K[s] = h_erlang_update(H[s - 1], K[s - 1], A[s], x_fixed, **h_args)
+        else:
+            H[s] = h_exp_update(H[s - 1], A[s - 1], x_fixed, **h_args)
 
     # return ts, M, spikes, A, X
 
@@ -156,6 +175,7 @@ def population_fast(
     M0=0,
     use_LambdaGamma=False,
     Gamma_ext=True,
+    kappa_type="exp",
 ):
     """
     Simulates an SRM neuron population.
@@ -252,6 +272,7 @@ def population(
     M0=0,
     use_LambdaGamma=False,
     Gamma_ext=True,
+    kappa_type="exp",
 ):
     """
     Simulates an SRM neuron population.
@@ -327,4 +348,5 @@ def population(
         I_ext,
         N,
         M0,
+        kappa_type,
     )
