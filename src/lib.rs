@@ -34,7 +34,7 @@ fn particle_population_py<'py>(
     i_ext: f64,
     n: i32,
     m0: PyReadonlyArrayDyn<f64>,
-) -> PyResult<&'py PyArrayDyn<f64>> {
+) {
     let gamma = gamma.as_array();
     let lambda = lambda.as_array();
     let m0 = m0.as_array();
@@ -86,7 +86,7 @@ fn particle_population_py<'py>(
         x_t[s] = x_t[s - 1] + dt * (-lambda_kappa * x_t[s - 1] + lambda_kappa * (j * activity[s] + x_fixed));
     }
     let m_t = m_t.into_pyarray(py);
-    Ok(m_t)
+    // Ok(m_t)
     // axpy(a, x, y).into_pyarray(py)
 }
 

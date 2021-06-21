@@ -16,6 +16,7 @@ def ASA1(
     theta=0,
     interaction=0,
     lambda_kappa=20,
+    base_I=0,
     I_ext_time=0,
     I_ext=0,
     a_cutoff=5,
@@ -81,7 +82,7 @@ def ASA1(
 
     def optimized(rho_t, m_t, h_t):
         for s in range(0, steps - 1):
-            x_fixed = I_ext if I_ext_time < dt * (s + 1) else 0
+            x_fixed = I_ext + base_I if I_ext_time < dt * (s + 1) else base_I
 
             num_age_steps = min(s, a_grid_size)
 
@@ -125,7 +126,6 @@ def ASA1(
             # Mass insertion
             rho_t[s + 1, 0] = np.sum(mass_transfer) + lass_cell_mass
 
-        print(k_t)
         return rho_t, m_t, h_t
 
     rho_t, m_t, h_t = optimized(rho_t, m_t, h_t)

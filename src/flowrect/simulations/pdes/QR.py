@@ -26,6 +26,7 @@ def quasi_renewal_pde(
     theta=0,
     interaction=0,
     lambda_kappa=20,
+    base_I=0,
     I_ext_time=0,
     I_ext=0,
     epsilon_c=1e-2,
@@ -51,8 +52,8 @@ def quasi_renewal_pde(
     tau_c = find_cutoff(0, 100, dt, Lambda, Gamma, epsilon_c)
     tau_c = np.round(tau_c, decimals=int(-np.log10(dt)))
 
-    tau_c = 5
     print(f"Calculated tau_c: {tau_c}")
+    tau_c = a_cutoff
 
     # Need dt = da
     a_grid_size = int(tau_c / dt)
@@ -79,47 +80,42 @@ def quasi_renewal_pde(
     K = a_grid_size
     da = dt
     J = interaction
-    c = c * np.exp(-theta / Delta)
+    c = (c * 1.0) * np.exp(-theta / Delta)
 
     @jit(nopython=True, cache=True)
     def optimized(rho_t, h_t, k_t, A_t):
+        Ks = np.arange(K)
+        exp_eta = np.exp(1 / Delta * eta_SRM(dt * Ks, Gamma, Lambda))
+        y = np.exp(1 / Delta * eta_SRM(np.linspace(0, 2 * tau_c, 2 * (K + 1)), Gamma, Lambda)) - 1
+        # x = eta_SRM(np.linspace(0, 2 * tau_c, 2 * K), Gamma, Lambda)
+
         for n in range(0, steps - 1):
-            x_fixed = I_ext if I_ext_time < dt * (n + 1) else 0
+            x_fixed = I_ext + base_I if I_ext_time < dt * (n + 1) else base_I
 
             # Calculate f~(t|t - a)
             # f[0] = f~(t_n|t_n), f[1] = f~(t_n | t_{n-1}), ..
             f = np.zeros(K)
             t_n = n * dt
 
+            sup = n - Ks
+            inf = n - Ks - K
+            integral = np.zeros(K)
+            # int2 = np.zeros(K)
             for k in range(K):
-                t_k = k * dt
-                sup = n - k
-                inf = n - k - K
-                integral = 0
-                for s in range(max(0, inf), sup):
-                    t_s = s * dt
-                    A = A_t[s]
-                    integral += (
-                        (np.exp(1 / Delta * eta_SRM_no_vector(t_n - t_s, Gamma, Lambda)) - 1)
-                        * A
-                        * dt
-                    )
-                f[k] = c * np.exp(
-                    1 / Delta * (h_t[n] + eta_SRM_no_vector(t_k, Gamma, Lambda)) + integral
-                )
+                t_s_idx = np.arange(max(0, inf[k]), sup[k])
+
+                idx = k + np.arange(len(t_s_idx))
+                integral[k] = np.sum(y[idx][::-1] * A_t[t_s_idx] * dt)
+
+            f = c * exp_eta * np.exp(1 / Delta * h_t[n] + integral)
+            # print(sum(f - f2))
 
             firing_prob = np.clip(f * da, 0, 1)
             # firing_prob = 1 - np.exp(-f * da)
 
             A_t[n] = np.sum(firing_prob * rho_t[n])
 
-            if kappa_type == "erlang":
-                h_t[n + 1], k_t[n + 1] = h_erlang_update(
-                    h_t[n], k_t[n], A_t[n], x_fixed, lambda_kappa, dt, J
-                )
-            else:
-                h_t[n + 1] = h_exp_update(h_t[n], A_t[n], x_fixed, x_fixed, lambda_kappa, dt, J)
-
+            h_t[n + 1] = h_t[n] + lambda_kappa * dt * (J * A_t[n] + x_fixed - h_t[n])
             # Next step
             # h_t[n + 1] = h_t[n] + dt * lambda_kappa * (-h_t[n] + (A_t[n] * J + x_fixed))
 

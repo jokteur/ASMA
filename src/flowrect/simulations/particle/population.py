@@ -16,6 +16,7 @@ def _simulation_slow(
     theta,
     interaction,
     lambda_kappa,
+    base_I,
     I_ext_time,
     I_ext,
     N,
@@ -47,7 +48,7 @@ def _simulation_slow(
 
     # If True, jumps by Lambda*Gamma instead of Lambda
     for s in range(1, steps):
-        x_fixed = I_ext if I_ext_time < dt * s else 0
+        x_fixed = I_ext + base_I if I_ext_time < dt * (s) else base_I
 
         activation = (
             1
@@ -67,7 +68,7 @@ def _simulation_slow(
         if kappa_type == "erlang":
             H[s], K[s] = h_erlang_update(H[s - 1], K[s - 1], A[s], x_fixed, **h_args)
         else:
-            H[s] = h_exp_update(H[s - 1], A[s - 1], x_fixed, **h_args)
+            H[s] = h_exp_update(H[s - 1], A[s], x_fixed, **h_args)
         # H[s] = H[s - 1] + dt * lambda_kappa * (-H[s - 1] + (J * A[s] + x_fixed))
 
     return ts, M, spikes, A, H
@@ -83,6 +84,7 @@ def population_nomemory(
     theta=0,
     interaction=0,
     lambda_kappa=20,
+    base_I=0,
     I_ext_time=0,
     I_ext=0,
     N=500,
@@ -120,7 +122,6 @@ def population_nomemory(
 
     m = np.zeros((N, dim))
     m_t = np.zeros((steps, dim))
-    n_t = np.zeros((steps, dim, dim))
     H = np.zeros(steps)
     K = np.zeros(steps)
     A = np.zeros(steps)
@@ -130,9 +131,9 @@ def population_nomemory(
 
     # If True, jumps by Lambda*Gamma instead of Lambda
     for s in range(1, steps):
-        x_fixed = I_ext if I_ext_time < dt * s else 0
+        x_fixed = I_ext + base_I if I_ext_time < dt * (s) else base_I
 
-        noise = np.zeros(N)
+        noise = np.random.rand(N)
 
         activation = (
             1 - np.exp(-dt * f_SRM(np.sum(m, axis=1) + H[s - 1], c=c, Delta=Delta, theta=theta))
@@ -140,23 +141,23 @@ def population_nomemory(
         )
         decay = ~activation
 
-        m[activation] += Gamma[activation]
-        m[decay] += dt * (-1 * Lambda[decay] * m[decay])
+        m[activation] = m[activation] + Gamma[activation]
+        m[decay] = m[decay] + dt * (-1 * Lambda[decay] * m[decay])
 
         num_activations = np.count_nonzero(activation)
         if num_activations:
             m_t[s] = np.mean(m[activation])
         else:
             m_t[s] = m_t[s - 1]
-        n_t[s] = np.outer(m_t[s], m_t[s])
+        # n_t[s] = np.outer(m_t[s], m_t[s])
         A[s] = 1 / N * np.count_nonzero(activation) / dt
 
         if kappa_type == "erlang":
             H[s], K[s] = h_erlang_update(H[s - 1], K[s - 1], A[s], x_fixed, **h_args)
         else:
-            H[s] = h_exp_update(H[s - 1], A[s - 1], x_fixed, **h_args)
+            H[s] = h_exp_update(H[s - 1], A[s], x_fixed, **h_args)
 
-    # return ts, M, spikes, A, X
+    return ts, A, H, m_t
 
 
 def population_fast(
@@ -169,6 +170,7 @@ def population_fast(
     theta=0,
     interaction=0,
     lambda_kappa=20,
+    base_I=0,
     I_ext_time=0,
     I_ext=0,
     N=500,
@@ -266,6 +268,7 @@ def population(
     theta=0,
     interaction=0,
     lambda_kappa=20,
+    base_I=0,
     I_ext_time=0,
     I_ext=0,
     N=500,
@@ -344,6 +347,7 @@ def population(
         theta,
         interaction,
         lambda_kappa,
+        base_I,
         I_ext_time,
         I_ext,
         N,

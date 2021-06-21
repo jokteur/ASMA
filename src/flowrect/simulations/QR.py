@@ -95,7 +95,7 @@ def _fast_QR(
 
         m[K - 1] = A[s - 1] * dt
         for k in list(range(0, K - 1))[::-1]:
-            m[k] = prev_m[k + 1] * np.exp(-dt * c * np.exp(h_int) * x[k + 1])
+            m[k] = prev_m[k + 1] * np.exp(-dt * c * np.exp(h_int / Delta) * x[k + 1])
 
         # Update A
         A[s] = c * np.exp(h_int / Delta) * (1 + np.dot(x - 1, m))
@@ -120,6 +120,7 @@ def quasi_renewal(
     I_ext=0,
     epsilon_c=1e-2,
     use_LambdaGamma=False,
+    kappa_type="exp",
 ):
     """
     Simulates the quasi-renewal approximation on an SRM neuron population model.
