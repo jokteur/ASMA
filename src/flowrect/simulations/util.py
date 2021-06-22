@@ -4,6 +4,7 @@ from numba.extending import overload
 
 
 def moving_average(x, w):
+    print("moving_av")
     return np.convolve(x, np.ones(w), "valid") / w
 
 

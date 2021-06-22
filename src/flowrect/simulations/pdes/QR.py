@@ -52,7 +52,7 @@ def quasi_renewal_pde(
     tau_c = find_cutoff(0, 100, dt, Lambda, Gamma, epsilon_c)
     tau_c = np.round(tau_c, decimals=int(-np.log10(dt)))
 
-    print(f"Calculated tau_c: {tau_c}")
+    # print(f"Calculated tau_c: {tau_c}")
     tau_c = a_cutoff
 
     # Need dt = da
@@ -108,10 +108,9 @@ def quasi_renewal_pde(
                 integral[k] = np.sum(y[idx][::-1] * A_t[t_s_idx] * dt)
 
             f = c * exp_eta * np.exp(1 / Delta * h_t[n] + integral)
-            # print(sum(f - f2))
 
-            firing_prob = np.clip(f * da, 0, 1)
-            # firing_prob = 1 - np.exp(-f * da)
+            # firing_prob = np.clip(f * da, 0, 1)
+            firing_prob = 1 - np.exp(-f * da)
 
             A_t[n] = np.sum(firing_prob * rho_t[n])
 
