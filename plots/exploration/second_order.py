@@ -18,6 +18,8 @@ from flowrect.simulations import (
     quasi_renewal,
 )
 
+from flowrect.simulations.pdes.QR import quasi_renewal_pde
+
 # Plot saving parameters
 save = False
 save_path = ""
@@ -39,21 +41,23 @@ def calculate_hist(ages, i):
 N = 5000
 dt = 1e-2
 params = dict(
-    time_end=15,
+    time_end=25,
     dt=dt,
     Lambda=np.array([10.3, 2.5]),
     Gamma=np.array([-2.0, -1.0]),
-    c=20,
+    c=10,
     Delta=4,
-    lambda_kappa=2,
-    I_ext=5.5,
-    I_ext_time=7.5,
+    theta=4,
+    lambda_kappa=50,
+    I_ext=2.5,
+    I_ext_time=15,
     interaction=0.0,
+    kappa_type="exp",
 )
 
 # params["Gamma"] /= params["Lambda"]
 
-a_cutoff = 5
+a_cutoff = 10
 
 print(f"Particle simulation")
 t = time.time()
@@ -63,6 +67,7 @@ m_tp = calculate_mt(M, spikes)
 before_spike = int(params["I_ext_time"] / dt) - 10
 m_t0 = m_tp[before_spike]
 h_t0 = H[before_spike]
+A_t0 = A[before_spike]
 
 I_ext_vec = np.concatenate(
     (np.zeros(int(len(ts) / 2)), params["I_ext"] * np.ones(int(len(ts) / 2)))
@@ -84,28 +89,56 @@ print(f"{time.time() - t:.2f}")
 # params["dt"] = 1e-2
 # print(f"{time.time() - t:.2f}s")
 
-print(f"Quasi renewal")
-QR_params = copy.copy(params)
-# QR_params["Gamma"] = np.array(params["Lambda"]) * np.array(params["Gamma"])
-ts, A_QR, _ = quasi_renewal(use_LambdaGamma=True, **params)
 
+# print(f"Flow rectification approximation")
+# t = time.time()
+# # params["dt"] = 1e-3
+# ts_1st, a_grid_1st, rho_t_1st, m_t_1st, x_t_1st, en_cons_1st, A_t_1st = flow_rectification(
+#     a_cutoff=a_cutoff, use_LambdaGamma=True, **params
+# )
+# print(f"{time.time() - t:.2f}s")
 
-print(f"Flow rectification approximation")
-t = time.time()
-# params["dt"] = 1e-3
-ts_1st, a_grid_1st, rho_t_1st, m_t_1st, x_t_1st, en_cons_1st, A_t_1st = flow_rectification(
-    a_cutoff=a_cutoff, use_LambdaGamma=True, **params
-)
-print(f"{time.time() - t:.2f}s")
+# print(f"Quasi renewal")
+# t = time.time()
+# # ts, A_QR, _ = quasi_renewal(use_LambdaGamma=True, **params)
+# ts_QR, a_grid_QR, rho_t_QR, h_t_QR, en_cons_QR, A_t_QR = quasi_renewal_pde(
+#     **params,
+#     a_cutoff=a_cutoff,
+#     # rho0=rho_t_1st[before_spike],
+#     # h_t0=h_t0,
+#     # A_t0=A_t_1st[before_spike],
+#     use_LambdaGamma=True,
+# )
+# print(f"{time.time() - t:.2f}s")
 
 
 print(f"ASA1")
 t = time.time()
 (ts_ASA1, a_grid_ASA1, rho_t_ASA1, m_t_ASA1, x_t_ASA1, en_cons_ASA1, A_t_ASA1,) = ASA1(
     a_cutoff=a_cutoff,
-    rho0=rho_t_1st[before_spike],
-    h_t0=h_t0,
-    m_t0=m_t0,
+    # rho0=rho_t_1st[before_spike],
+    # h_t0=h_t0,
+    # m_t0=m_t0,
+    use_LambdaGamma=True,
+    **params,
+)
+print(f"{time.time() - t:.2f}s")
+print(f"ASA1 2")
+params["kappa_type"] = "erlang"
+t = time.time()
+(
+    ts_ASA1_2,
+    a_grid_ASA1_2,
+    rho_t_ASA1_2,
+    m_t_ASA1_2,
+    x_t_ASA1_2,
+    en_cons_ASA1_2,
+    A_t_ASA1_2,
+) = ASA1(
+    a_cutoff=a_cutoff,
+    # rho0=rho_t_1st[before_spike],
+    # h_t0=h_t0,
+    # m_t0=m_t0,
     use_LambdaGamma=True,
     **params,
 )
@@ -114,6 +147,7 @@ print(f"{time.time() - t:.2f}s")
 
 def energy_conservation_plot(ax):
     ax.plot(ts_ASA1, en_cons_ASA1, "--k")
+    # ax.plot(ts_QR, en_cons_QR, "-.b")
     ax.set_title("Energy conservation")
     ax.set_xlabel("time t")
 
@@ -121,11 +155,13 @@ def energy_conservation_plot(ax):
 def m_t_plot(ax):
     ax.set_title("m_t")
     ax.plot(ts, m_tp[:, 0], "--k", label="particulaire")
-    ax.plot(ts_1st, m_t_ASA1[:, 0], "--r", label="ASA1 v2")
-    ax.plot(ts_1st, m_t_1st[:, 0], "-b", label="FR")
+    ax.plot(ts_ASA1, m_t_ASA1[:, 0], "--r", label="ASA1")
+    ax.plot(ts_ASA1_2, m_t_ASA1_2[:, 0], "-.m", label="ASA1 2")
+    # ax.plot(ts_1st, m_t_1st[:, 0], "-b", label="FR")
     ax.plot(ts, m_tp[:, 1], "--k")
-    ax.plot(ts_1st, m_t_ASA1[:, 1], "--r")
-    ax.plot(ts_1st, m_t_1st[:, 1], "-b")
+    ax.plot(ts_ASA1, m_t_ASA1[:, 1], "--r")
+    ax.plot(ts_ASA1_2, m_t_ASA1_2[:, 1], "-.m")
+    # ax.plot(ts_1st, m_t_1st[:, 1], "-b")
     ax.set_ylim(-30, 1)
     ax.legend()
 
@@ -133,12 +169,12 @@ def m_t_plot(ax):
 def activity_plot(ax):
     ax.set_title("Activity")
     A_av = moving_average(A, 50)
-    ax.plot(ts, A, "--k", label="Particle", alpha=0.1)
-    ax.plot(ts[: len(A_av)], A_av, "--r", label="P. rolling av.")
+    ax.plot(ts, A, "--k", label="Particle", alpha=0.9)
+    # ax.plot(ts[24:-25], A_av, "--r", label="P. rolling av.")
     # ax.plot(ts_1st, A_t_1st, "-b", linewidth=1.5, label="1st")
-    # ax.plot(ts_1st, A_QR, "-.m", linewidth=1.5, label="QR")
-    ax.plot(ts_ASA1, A_t_ASA1, "-.", linewidth=1.5, label="ASA1 v2")
-    # ax.plot(ts_int, A_t_int, "-.", linewidth=1.5, label="Integral")
+    # ax.plot(ts_QR, A_t_QR, "-.m", linewidth=1.5, label="QR")
+    ax.plot(ts_ASA1, A_t_ASA1, "-.", linewidth=1.5, label="ASA1")
+    ax.plot(ts_ASA1_2, A_t_ASA1_2, "-.", linewidth=1.5, label="ASA1 erlang")
     # ax.plot(ts, A_t_2nd, "-g", linewidth=1.5, label="2nd")
     ax.set_ylim(0, 10)
     ax.legend()
@@ -147,7 +183,7 @@ def activity_plot(ax):
 def interaction_plot(ax):
     ax.set_title("h_t")
     ax.plot(ts, H, "--k", label="Particle")
-    ax.plot(ts_1st, x_t_1st, "--b", linewidth=1.5, label="1st")
+    # ax.plot(ts_1st, x_t_1st, "--b", linewidth=1.5, label="1st")
     ax.plot(ts_ASA1, x_t_ASA1, "-.", linewidth=1.5, label="ASA1 v2")
     ax.legend()
 
@@ -185,10 +221,10 @@ class AnimatedPlot:
 
         # density plot (PDE)
         # self.plots["p_rho"] = self.ax1.plot([], [], "-k", label="Particle")[0]
-        self.plots["rho"] = self.ax1.plot(
-            a_grid_1st, rho_t_1st[0], "--r", linewidth=1, label="1st"
+        self.plots["rho_QR"] = self.ax1.plot(
+            a_grid_QR, rho_t_QR[0], "--r", linewidth=1, label="QR"
         )[0]
-        self.plots["rho2nd"] = self.ax1.plot(
+        self.plots["rho_ASA"] = self.ax1.plot(
             a_grid_ASA1, rho_t_ASA1[0], "-b", linewidth=1, label="ASA1"
         )[0]
         # self.plots["S"] = self.ax1.plot(a_grid, S[0], "g", linewidth=1)[0]
@@ -218,8 +254,8 @@ class AnimatedPlot:
         self.plots["vline"].set_data(np.array([t, t]), np.array([0, 6]))
 
         # PDE rho
-        self.plots["rho"].set_data(a_grid_1st, rho_t_1st[i])
-        self.plots["rho2nd"].set_data(a_grid_ASA1, rho_t_ASA1[i])
+        self.plots["rho_QR"].set_data(a_grid_QR, rho_t_QR[i])
+        self.plots["rho_ASA"].set_data(a_grid_ASA1, rho_t_ASA1[i])
         # self.plots["S"].set_data(a_grid, S[i])
         return tuple(self.plots.values())
 

@@ -101,9 +101,13 @@ def ASA1(
             # firing_prob = np.zeros(a_grid_size)
             # for i in range(a_grid_size):
             #     firing_prob[i] = f[i] if i < 1 else 1
-            firing_prob = np.clip(f * da, 0, 1)
+            # firing_prob = np.clip(f * da, 0, 1)
+            firing_prob = 1 - np.exp(-f * da)
 
             A_t[s] = np.sum(firing_prob * rho_t[s])
+
+            if A_t[s] < 1e-6:
+                A_t[s] = 1e-6
 
             m_t[s + 1] = (
                 np.sum((a_iplusone * exp_m_t + Gamma).T * firing_prob * rho_t[s], axis=1) / A_t[s]
