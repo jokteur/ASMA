@@ -18,7 +18,12 @@ Once the environnement is created, activate the environment (through `source pat
 
 git clone https://github.com/jokteur/epfl-master-project
 
-Install the package with the following command
+For the Rust accelerated code, please install Rust-Lang on your system: https://www.rust-lang.org/. Then, install the Rust setup tool with:
+```
+pip install -r requirements-dev.txt
+```
+
+Once this is done, install the package with the following command
 
 ```
 cd epfl-master-project
@@ -26,13 +31,3 @@ pip install -e .
 ```
 
 this will install the package from the folder. If changes are made (new commits), then the package will be automatically updated.
-
-# Use the interactive widget
-
-Once the package is installed, before launching the app, make sure that your environment is activated. Then simply type :
-
-```
-markov-emdedding-widget
-```
-
-this will open a window in your browser, and you can start to interact with the model.
