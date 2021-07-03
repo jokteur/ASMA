@@ -131,8 +131,8 @@ def plot_A_inf(
 
     plt.plot(I_vec, Ainf_PDE, "-r", label="ASMA")
     plt.plot(I_vec, Ainf_QR, "-b", label="QR")
-    plt.errorbar(I_vec_p, Ainf_P, Ainf_std_P, fmt=".k", capsize=2.0, label=f"Particles ({N=})")
-    plt.xlabel(r"$I_0$ (A)")
+    plt.errorbar(I_vec_p, Ainf_P, Ainf_std_P, fmt=".k", capsize=2.0, label=r"$25\cdot10^3$ neurons")
+    plt.xlabel(r"$I_1$ (A)")
     plt.ylabel(r"$A_{\infty}$ (Hz)")
     plt.legend()
     plt.tight_layout()

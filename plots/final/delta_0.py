@@ -101,17 +101,17 @@ def plot_delta_0(
         begin_P_idx = int((params["I_ext_time"] - time_before_input) / params["dt"])
 
         ax = axs[i]
-        ax.set_title(fr"$\Delta = {delta} (mV), " r"I^{\mathrm{ext}}" fr"={I_ext}$ (A)")
+        ax.set_title(fr"$\Delta = {delta} (mV), " r"I_1" fr"={I_ext}$ (A)")
         if w:
             new_A = moving_average(A, w)
             ax.plot(
                 ts_P[begin_P_idx + w // 2 - 1 : -w // 2],
                 new_A[begin_P_idx:],
                 "--k",
-                label="Particle",
+                label=r"$25\cdot10^3$ neurons",
             )
         else:
-            ax.plot(ts_P[begin_P_idx:], A[begin_P_idx:], "--k", label="Particle")
+            ax.plot(ts_P[begin_P_idx:], A[begin_P_idx:], "--k", label=r"$25\cdot10^3$ neurons")
 
         ax.plot(ts_ASMA[begin_idx:], A_t_ASMA[begin_idx:], "-r", label="ASMA")
         if plot_QR:

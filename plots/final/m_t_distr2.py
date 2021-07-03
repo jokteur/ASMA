@@ -12,6 +12,7 @@ from matplotlib.patches import Patch
 import matplotlib.animation as animation
 from numba import jit, prange
 from scipy.interpolate import griddata
+import matplotlib
 
 import flowrect
 from flowrect.simulations.util import calculate_age, calculate_mt, eta_SRM
@@ -56,10 +57,6 @@ def right_after_spike(M, spikes):
     M_after_spike = M
     mask = spikes == 0
     M_after_spike[mask] = np.nan
-    # for i in range(1, M.shape[0]):
-    #     mask = spikes[i] == 1
-    #     M_after_spike[i][mask] = M[i][mask]
-    #     M_after_spike[i][~mask] = M_after_spike[i - 1][~mask]
     return M_after_spike
 
 
@@ -80,12 +77,14 @@ def plot_m_t_distr(
     plot_H=False,
     savepath="",
     savename="",
+    cmap="Greens",
     save=False,
     usetex=False,
     figsize=(12, 5),
     inset=None,
     dpi=None,
     title=None,
+    simple_m=False,
     font_family="serif",
     font_size="12",
     noshow=False,
@@ -93,6 +92,7 @@ def plot_m_t_distr(
     if usetex:
         plt.rc("text", usetex=True)
         plt.rc("font", family=font_family, size=font_size)
+        matplotlib.rcParams["text.latex.preamble"] = [r"\usepackage{amsmath}"]
 
     dim = len(params["Lambda"])
     dt = params["dt"]
@@ -129,7 +129,10 @@ def plot_m_t_distr(
         end_idx = int(params["I_ext_time"] / dt)
 
         # Figure out the distribution of m after spike
-        M_after_spike = right_after_spike(M, spikes)
+
+        M_after_spike = M
+        if not simple_m:
+            M_after_spike = right_after_spike(M, spikes)
 
         bins = num_bins - 3 * i
         time_points = np.repeat(ts[begin_idx:], bins)
@@ -161,7 +164,7 @@ def plot_m_t_distr(
                 s=0.2,
                 marker="s",
                 c=hist_points,
-                cmap="Greens",
+                cmap=cmap,
             )
 
             (m_t_plot,) = ax.plot(
@@ -169,7 +172,7 @@ def plot_m_t_distr(
                 m_t_ASMA[begin_idx:, a],
                 "-r",
                 alpha=0.5,
-                label=r"$\delta_{m-\overline{m}_t}$",
+                label=r"$\delta_{\boldsymbol{m}-\overline{\boldsymbol{m}}_t}$",
             )
             # ax.plot(
             #     ts[begin_idx:],
@@ -184,16 +187,16 @@ def plot_m_t_distr(
 
             # m_t distribution
             ax.set_xlabel(fr"Time $t$")
-            ax.set_ylabel(fr"$m_{a}$")
+            ax.set_ylabel(fr"$m_{a+1}$")
             plt.tight_layout()
+            label = r"Density over $\boldsymbol{m}$ `just after spike'"
+            if simple_m:
+                label = r"Density over $\boldsymbol{m}$"
             if a == 0 and i == 0:
                 handles, _ = scatter.legend_elements(alpha=0.6)
                 ax.legend(
                     [m_t_plot, handles[-1]],
-                    [
-                        r"$\delta_{m-\overline{m}_t}$",
-                        r"Density over $m$ (after spike)",
-                    ],
+                    [r"$\delta_{\boldsymbol{m}-\overline{\boldsymbol{m}}_t}$", label],
                     loc="lower left",
                 )
 

@@ -9,7 +9,7 @@ from kernel import plot_kernel
 # Simulation parameters
 params = dict(
     dt=0.5 * 1e-2,
-    time_end=40,
+    time_end=18,
     Lambda=np.array([28.0, 8.0, 1.0]),
     Gamma=np.array([-3.5, 3.0, -1.0]),
     c=20,
@@ -52,10 +52,10 @@ for I_ext in [0.5, 1, 1.5]:
         params_p=params_p,
         N=25000,
         w=7,
-        time_before_input=3,
+        time_before_input=1,
         plot_QR=True,
         plot_H=False,
-        ylim=15,
+        ylim=(3, 11),
         I_ylim=4,
         a_cutoff=10,
         savename=f"A_t_{I_ext}.png",

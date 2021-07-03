@@ -8,6 +8,7 @@ import matplotlib.text as mtext
 from matplotlib import gridspec
 from matplotlib.animation import FuncAnimation
 import matplotlib.animation as animation
+import matplotlib
 
 import flowrect
 from flowrect.simulations.util import calculate_age, calculate_mt, eta_SRM, moving_average
@@ -40,6 +41,7 @@ def plot_activity(
     inset=None,
     dpi=None,
     title=None,
+    loc="best",
     font_family="serif",
     font_size="12",
     noshow=False,
@@ -47,6 +49,7 @@ def plot_activity(
     if usetex:
         plt.rc("text", usetex=True)
         plt.rc("font", family=font_family, size=font_size)
+        matplotlib.rcParams["text.latex.preamble"] = [r"\usepackage{amsmath}"]
 
     dt = params["dt"]
     I_time = params["I_ext_time"]
@@ -106,15 +109,20 @@ def plot_activity(
     if w:
         new_A = moving_average(A, w)
         (plots["p"],) = ax1.plot(
-            ts_P[begin_P_idx + w // 2 - 1 : -w // 2], new_A[begin_P_idx:], "--k", label="Particle"
+            ts_P[begin_P_idx + w // 2 - 1 : -w // 2],
+            new_A[begin_P_idx:],
+            "--k",
+            label=r"$25\cdot10^3$ neurons",
         )
     else:
-        (plots["p"],) = ax1.plot(ts_P[begin_P_idx:], A[begin_P_idx:], "--k", label="Particle")
+        (plots["p"],) = ax1.plot(
+            ts_P[begin_P_idx:], A[begin_P_idx:], "--k", label=r"$25\cdot10^3$ neurons"
+        )
     (plots["ASMA"],) = ax1.plot(ts_ASMA[begin_idx:], A_t_ASMA[begin_idx:], "-r", label="ASMA")
     if plot_QR:
         (plots["QR"],) = ax1.plot(ts_QR[begin_idx:], A_t_QR[begin_idx:], "-b", label="QR")
 
-    ax1.set_ylim(0, ylim)
+    ax1.set_ylim(ylim[0], ylim[1])
     ax1.set_xlim(ts_ASMA[begin_idx], ts_ASMA[-1])
     ax1.set_ylabel(r"Activity $A_t$ (Hz)")
     if num_plots == 1:
@@ -135,10 +143,10 @@ def plot_activity(
                 ts_P[begin_P_idx + w // 2 - 1 : -w // 2],
                 new_A[begin_P_idx:],
                 "--k",
-                label="Particle",
+                label=r"$25\cdot10^3$ neurons",
             )
         else:
-            axins.plot(ts_P[begin_P_idx:], A[begin_P_idx:], "--k", label="Particle")
+            axins.plot(ts_P[begin_P_idx:], A[begin_P_idx:], "--k", label=r"$25\cdot10^3$ neurons")
         axins.plot(ts_ASMA[begin_idx:], A_t_ASMA[begin_idx:], "-r", label="ASMA")
         if plot_QR:
             axins.plot(ts_QR[begin_idx:], A_t_QR[begin_idx:], "-b", label="QR")
@@ -146,7 +154,7 @@ def plot_activity(
         axins.set_xticklabels("")
         axins.set_yticklabels("")
         ax1.indicate_inset_zoom(axins, edgecolor="black")
-    ax1.legend(handles=plots.values())
+    ax1.legend(handles=plots.values(), loc=loc)
 
     i = 1
 
@@ -174,7 +182,7 @@ def plot_activity(
         ax.set_ylim(0, I_ylim)
         ax.plot(ts_ASMA[begin_idx:], I_ext_vec[begin_idx:], "-k")
         ax.set_xlabel(r"$t$ (s)")
-        ax.set_ylabel(r"$I_0$ (A)")
+        ax.set_ylabel(r"$I^{\text{ext}}$ (A)")
         ax.tick_params(direction="in")
         if i == num_plots:
             ax.tick_params(direction="out")

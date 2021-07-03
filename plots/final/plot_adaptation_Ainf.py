@@ -10,7 +10,7 @@ from A_inf import plot_A_inf
 params = dict(
     dt=0.5 * 1e-2,
     time_end=40,
-    Lambda=np.array([12.3, 2.5]),
+    Lambda=np.array([23.3, 2.5]),
     Gamma=np.array([-8.0, -2.5]),
     c=30,
     lambda_kappa=50,

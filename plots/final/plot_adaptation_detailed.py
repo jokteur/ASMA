@@ -8,7 +8,7 @@ from kernel import plot_kernel
 # Simulation parameters
 params = dict(
     dt=0.5 * 1e-2,
-    time_end=20,
+    time_end=17,
     Lambda=np.array([12.3, 2.5]),
     Gamma=np.array([-8.0, -2.5]),
     c=30,
@@ -39,7 +39,7 @@ plot_activity(
     params,
     params_p=params_p,
     N=25000,
-    time_before_input=3,
+    time_before_input=1,
     plot_QR=True,
     plot_H=False,
     w=7,
@@ -47,7 +47,8 @@ plot_activity(
         [0.49, 0.49, 0.5, 0.5],
         [params["I_ext_time"] - 0.1, params["I_ext_time"] + 1, 3.46, 8.2],
     ],
-    ylim=15,
+    loc="upper left",
+    ylim=(2.5, 12),
     I_ylim=4,
     a_cutoff=7,
     savename=f"A_t_detailed.png",
